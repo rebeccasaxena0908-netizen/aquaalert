@@ -21,8 +21,12 @@ class TransformerClassifier:
         self.name = f"transformer:{Path(model_dir).name}"
         self._torch = torch
         self._max_length, self._batch_size = max_length, batch_size
+        self._device = (
+            "cuda" if torch.cuda.is_available()
+            else "mps" if torch.backends.mps.is_available() else "cpu"
+        )
         self._tok = AutoTokenizer.from_pretrained(model_dir)
-        self._model = AutoModelForSequenceClassification.from_pretrained(model_dir).eval()
+        self._model = AutoModelForSequenceClassification.from_pretrained(model_dir).to(self._device).eval()
         id2label = self._model.config.id2label
         self._labels = [id2label[i] for i in range(len(id2label))]
 
@@ -35,7 +39,7 @@ class TransformerClassifier:
                 max_length=self._max_length,
                 padding=True,
                 return_tensors="pt",
-            )
+            ).to(self._device)
             with self._torch.no_grad():
                 probs = self._model(**batch).logits.softmax(-1).tolist()
             out.extend(dict(zip(self._labels, p)) for p in probs)

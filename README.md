@@ -29,7 +29,7 @@ pytest
 ```bash
 python -m aquaalert.ingest.replay data/sample_posts.csv --speed 600
 python -m aquaalert.pipeline data/sample_posts.csv
-python -m aquaalert.classify.train --data data/raw/humaid.csv --label-dataset humaid --out models/muril-crisis
+python -m aquaalert.classify.train --data data/raw/humaid.csv --label-dataset humaid --out models/muril
 ```
 Training writes the model and `metrics.json` (accuracy, macro-F1, per-class report) to `--out`.
 With `AQUAALERT_CLASSIFIER=auto` the dashboard uses the trained model if `AQUAALERT_MODEL_DIR` exists,

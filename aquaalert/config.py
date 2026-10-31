@@ -33,7 +33,7 @@ class Settings:
 def get_settings() -> Settings:
     return Settings(
         classifier=os.getenv("AQUAALERT_CLASSIFIER", "auto"),
-        model_dir=_path(os.getenv("AQUAALERT_MODEL_DIR", "models/muril-crisis")),
+        model_dir=_path(os.getenv("AQUAALERT_MODEL_DIR", "models/muril")),
         base_model=os.getenv("AQUAALERT_BASE_MODEL", "google/muril-base-cased"),
         geocoder_user_agent=os.getenv("AQUAALERT_GEOCODER_USER_AGENT", "aquaalert-dev"),
         geocode_online=os.getenv("AQUAALERT_GEOCODE_ONLINE", "false").lower() == "true",

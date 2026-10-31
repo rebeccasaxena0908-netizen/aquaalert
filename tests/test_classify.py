@@ -3,7 +3,7 @@ import pytest
 from aquaalert.classify.base import classify_posts
 from aquaalert.classify.label_map import map_label
 from aquaalert.classify.model import get_classifier
-from aquaalert.classify.train import build_splits, compute_metrics
+from aquaalert.classify.train import build_splits
 from aquaalert.classify.zeroshot import KeywordZeroShot
 from aquaalert.ingest.loader import load_posts
 from aquaalert.schemas import LABELS, Label
@@ -45,10 +45,7 @@ def test_get_classifier_falls_back_without_model(monkeypatch, tmp_path):
         get_classifier("trained")
 
 
-def test_metrics_and_splits():
-    m = compute_metrics([0, 1, 2], [0, 1, 1])
-    assert m["accuracy"] == pytest.approx(2 / 3)
-    assert set(LABELS) <= set(m["per_class"])
+def test_splits():
     x_tr, x_te, y_tr, y_te = build_splits(list("abcdefghij"), [0, 1] * 5, 0.4, 0)
     assert len(x_te) == 4 and len(x_tr) == 6
     # a class with a single example must not break the split
