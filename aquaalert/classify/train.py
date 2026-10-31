@@ -50,6 +50,8 @@ def train(
     max_length: int = 96,
     seed: int = 42,
     n_boot: int = 1000,
+    checkpoint_dir: str | None = None,
+    resume: bool = False,
 ) -> dict:
     import numpy as np
     import torch
@@ -116,7 +118,7 @@ def train(
     # explicit step count: `warmup_ratio` was removed in transformers 5
     warmup_steps = int(0.06 * -(-len(x_tr) // batch_size) * epochs)
     args = TrainingArguments(
-        output_dir=str(out_dir / "checkpoints"),
+        output_dir=checkpoint_dir or str(out_dir / "checkpoints"),
         num_train_epochs=epochs,
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size * 2,
@@ -130,6 +132,7 @@ def train(
         metric_for_best_model="macro_f1",
         greater_is_better=True,
         logging_steps=100,
+        fp16=torch.cuda.is_available(),  # mixed precision on CUDA only (MPS/CPU stay fp32)
         seed=seed,
         report_to=[],
     )
@@ -141,7 +144,7 @@ def train(
         data_collator=DataCollatorWithPadding(tok),
         compute_metrics=dev_metrics,
     )
-    trainer.train()
+    trainer.train(resume_from_checkpoint=True if resume else None)
     trainer.save_model(str(out_dir))
     tok.save_pretrained(str(out_dir))
 
@@ -179,9 +182,12 @@ def main() -> None:
     p.add_argument("--batch-size", type=int, default=32)
     p.add_argument("--lr", type=float, default=3e-5)
     p.add_argument("--max-length", type=int, default=96)
+    p.add_argument("--checkpoint-dir", default=None, help="where Trainer writes checkpoints (e.g. on Google Drive)")
+    p.add_argument("--resume", action="store_true", help="resume from the last checkpoint in --checkpoint-dir")
     a = p.parse_args()
     train(a.out, a.train_path, a.val_path, a.test_path, a.data, a.label_dataset, a.base_model,
-          a.epochs, a.batch_size, a.lr, a.max_length)
+          a.epochs, a.batch_size, a.lr, a.max_length,
+          checkpoint_dir=a.checkpoint_dir, resume=a.resume)
 
 
 if __name__ == "__main__":
