@@ -1,0 +1,51 @@
+id,text,timestamp,source,author,label
+s001,"URGENT: 12 people stranded on the roof in Chengannur, water rising fast. Please send boats! Call 9847012345",2018-08-15 06:10:00,sample,user_a,rescue_needed
+s002,"Family of 5 trapped on first floor at Aluva near the Periyar, need rescue immediately. Contact 9895123456",2018-08-15 06:45:00,sample,user_b,rescue_needed
+s003,"Heavy rain continues in Idukki. Cheruthoni dam shutters opened, water level 2398 ft",2018-08-15 07:05:00,sample,user_c,info_update
+s004,"Bridge near Kuttanad has collapsed after the flood. Road completely cut off.",2018-08-15 07:30:00,sample,user_d,infrastructure_damage
+s005,"We need drinking water and food packets at the relief camp in Pandalam. About 200 people here.",2018-08-15 08:00:00,sample,user_e,need_supplies
+s006,"Volunteers with 3 boats available in Thrissur. DM us to coordinate rescue.",2018-08-15 08:20:00,sample,user_f,offer_help
+s007,"Missing: my grandmother Leela (72) last seen at Ranni on Tuesday. Please share. 9446001122",2018-08-15 08:40:00,sample,user_g,missing_person
+s008,"Watching the match tonight, who else is up? #cricket",2018-08-15 09:00:00,sample,user_h,irrelevant
+s009,"Chalakudy river is overflowing. Houses near the bridge submerged. 8 people need help urgently.",2018-08-15 09:15:00,sample,user_i,rescue_needed
+s010,"Road to Kochi airport flooded, runway closed till Aug 26. Flights suspended.",2018-08-15 09:40:00,sample,user_j,info_update
+s011,"Power lines down across Aranmula. Transformer destroyed, no electricity for 2 days.",2018-08-15 10:00:00,sample,user_k,infrastructure_damage
+s012,"Need medicines and insulin for elderly patients at Ernakulam camp. Urgent.",2018-08-15 10:20:00,sample,user_l,need_supplies
+s013,"Hum Pathanamthitta me phase hue hain, 20 log chhat par hain, paani badh raha hai. Please help! 9961234567",2018-08-15 10:45:00,sample,user_m,rescue_needed
+s014,"Kozhikode me khaana aur kapde chahiye relief camp ke liye. Koi help kar sakta hai?",2018-08-15 11:00:00,sample,user_n,need_supplies
+s015,"Offering free stay for 15 families at my house in Kakkanad. Message me.",2018-08-15 11:20:00,sample,user_o,offer_help
+s016,"Have you seen my brother Rajesh? Missing since the flood hit Kuttanad. Wearing blue shirt.",2018-08-15 11:35:00,sample,user_p,missing_person
+s017,"Good morning everyone! Lovely weather today.",2018-08-15 11:50:00,sample,user_q,irrelevant
+s018,"Landslide at Wayanad blocked the highway near Vythiri. Several houses damaged.",2018-08-15 12:10:00,sample,user_r,infrastructure_damage
+s019,"CM announces relief fund, 8000 relief camps opened across Kerala.",2018-08-15 12:30:00,sample,user_s,info_update
+s020,"SOS! Pregnant woman needs evacuation at Paravur, labour pain started. Water everywhere. 9847998877",2018-08-15 12:50:00,sample,user_t,rescue_needed
+s021,"Rescue boats needed at Edathua, 30 people on a terrace without food since morning.",2018-08-15 13:10:00,sample,user_u,rescue_needed
+s022,"Fishermen from Alappuzha are bringing their boats to help rescue operations. Thank you heroes!",2018-08-15 13:30:00,sample,user_v,offer_help
+s023,"Clothes and blankets needed at Thiruvalla relief camp. Babies are cold.",2018-08-15 13:50:00,sample,user_w,need_supplies
+s024,"Mullaperiyar dam water level rising, 142 ft. Authorities issue red alert for Idukki.",2018-08-15 14:10:00,sample,user_x,info_update
+s025,"Railway tracks washed away near Shoranur. Trains cancelled.",2018-08-15 14:30:00,sample,user_y,infrastructure_damage
+s026,"Missing person alert: Anil Kumar, 45, last contact from Chengannur 2 days ago.",2018-08-15 14:50:00,sample,user_z,missing_person
+s027,"Free sale on shoes this weekend, 50% off!",2018-08-15 15:00:00,sample,user_a2,irrelevant
+s028,"Ami Alappuzha te ache, 6 jon manush bondi, nouka dorkar. Please help 9847554433",2018-08-15 15:20:00,sample,user_b2,rescue_needed
+s029,"We can donate 500 food packets, trucks ready in Kottayam. Tell us where to send.",2018-08-15 15:40:00,sample,user_c2,offer_help
+s030,"Water has entered the ground floor at Palakkad town. 4 elderly people need to be moved.",2018-08-15 16:00:00,sample,user_d2,rescue_needed
+s031,"Sewage pipelines burst in Kochi, roads damaged badly near Edappally.",2018-08-15 16:20:00,sample,user_e2,infrastructure_damage
+s032,"IMD forecasts extreme rainfall for the next 48 hours in Kerala.",2018-08-15 16:40:00,sample,user_f2,info_update
+s033,"Need sanitary pads, water and rice at Munnar camp. 80 women stranded.",2018-08-15 17:00:00,sample,user_g2,need_supplies
+s034,"Looking for my son Arun (10) separated from us in Aluva. Please call 9544112233",2018-08-15 17:20:00,sample,user_h2,missing_person
+s035,"Doctors available for free medical aid at Kochi relief camps, bring prescriptions.",2018-08-15 17:40:00,sample,user_i2,offer_help
+s036,"lol this movie is so boring",2018-08-15 18:00:00,sample,user_j2,irrelevant
+s037,"Kannur me baadh se road toot gayi hai, bridge damaged, traffic band.",2018-08-15 18:20:00,sample,user_k2,infrastructure_damage
+s038,"Help! 15 people stuck in a church at Kuttanad, no food, no water, boats needed now.",2018-08-15 18:40:00,sample,user_l2,rescue_needed
+s039,"Update: water levels receding at Thrissur, normal bus service resumes tomorrow.",2018-08-15 19:00:00,sample,user_m2,info_update
+s040,"Please send diesel and food to the pumping station at Vypin. 100 people sheltering.",2018-08-15 19:20:00,sample,user_n2,need_supplies
+s041,"Can volunteers help clean houses in Pandalam after the flood? We have gloves and masks.",2018-08-15 19:40:00,sample,user_o2,offer_help
+s042,"Mere pitaji laapata hain, last seen Thrissur railway station. Koi khabar ho toh batayein.",2018-08-15 20:00:00,sample,user_p2,missing_person
+s043,"Flood level 6 feet at Kottayam, rescue teams on the way. Stay calm.",2018-08-15 20:20:00,sample,user_q2,info_update
+s044,"Houses collapsed and roads destroyed in Ranni, huge damage to property.",2018-08-15 20:40:00,sample,user_r2,infrastructure_damage
+s045,"Need rescue! 3 kids and 2 adults on the rooftop in Perumbavoor. Water is above 8 feet. 9633445566",2018-08-15 21:00:00,sample,user_s2,rescue_needed
+s046,"Anyone know a good biryani place?",2018-08-15 21:20:00,sample,user_t2,irrelevant
+s047,"Food and drinking water urgently required at Chalakudy school camp, 150 people.",2018-08-15 21:40:00,sample,user_u2,need_supplies
+s048,"Our team of 25 NDRF volunteers reached Idukki, ready to assist.",2018-08-15 22:00:00,sample,user_v2,offer_help
+s049,"Heavy rainfall alert for Wayanad and Kozhikode districts tonight.",2018-08-15 22:20:00,sample,user_w2,info_update
+s050,"Please help! Elderly couple stuck at home near Aranmula temple, water entering the house. 9446778899",2018-08-15 22:40:00,sample,user_x2,rescue_needed
