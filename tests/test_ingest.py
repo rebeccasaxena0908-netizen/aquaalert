@@ -58,3 +58,31 @@ def test_replay_no_wait(sample_path):
     waits: list[float] = []
     assert len(list(replay(load_posts(sample_path), speed=0, sleep=waits.append))) == 50
     assert waits == []
+
+
+def test_humaid_rescue_rule():
+    req = "requests_or_urgent_needs"
+    assert map_label(req, "humaid", "Families stranded on rooftops, need rescue now") == Label.RESCUE_NEEDED
+    assert map_label(req, "humaid", "We need food and water at the shelter") == Label.NEED_SUPPLIES
+    assert map_label(req, "humaid", "Rescue teams are distributing blankets") == Label.NEED_SUPPLIES
+    assert map_label(req, "humaid") == Label.NEED_SUPPLIES  # no text -> default
+    # the rule applies only to the urgent-needs class
+    assert map_label("caution_and_advice", "humaid", "people stranded") == Label.INFO_UPDATE
+
+
+def test_humaid_all_eleven_categories_covered():
+    from aquaalert.classify.label_map import HUMAID_MAP
+
+    assert len(HUMAID_MAP) == 11
+    assert map_label("Dont know cant judge", "humaid") is None
+    assert map_label("Rescue volunteering or donation effort", "humaid") == Label.OFFER_HELP
+
+
+def test_load_labeled_tsv(tmp_path):
+    from aquaalert.ingest.loader import load_labeled
+
+    path = tmp_path / "e.tsv"
+    path.write_text("tweet_id\ttweet_text\tclass_label\n1\tstuck on the roof\trequests_or_urgent_needs\n"
+                    "2\tthoughts with everyone\tsympathy_and_support\n3\t?\tdont_know_cant_judge\n")
+    assert load_labeled(path, "humaid") == [("stuck on the roof", Label.RESCUE_NEEDED),
+                                            ("thoughts with everyone", Label.IRRELEVANT)]
