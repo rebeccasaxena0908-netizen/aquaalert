@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- First two items: real SACHET all-India feed saved 2026-11-01. Third item: constructed for tests. -->
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>All India: CAP Disaster Alert Feeds</title>
+    <description>CAP Integrated Alert System Warning Updates</description>
+    <language>en</language>
+    <link>https://sachet.ndma.gov.in/cap_public_website/rss/rss_india.xml</link>
+    <atom:link href="https://sachet.ndma.gov.in/cap_public_website/rss/rss_india.xml" rel="self" type="application/rss+xml"/>
+    <copyright>public domain</copyright>
+    <pubDate>Fri, 16 Oct 2026 09:04:39 GMT</pubDate>
+    <item>
+      <title>कहीं-कहीं हल्की से मध्यम वर्षा के साथ गर्जन /आकाशीय बिजली चमकने / झोंकेदार हवाएं (30-40 kmph) चलने की संभावना है।</title>
+      <description/>
+      <category>Met</category>
+      <link>https://sachet.ndma.gov.in/cap_public_website/FetchXMLFile?identifier=1793546659345009</link>
+      <author>controlroom@ndma.gov.in (IMD Dehradun)</author>
+      <guid isPermaLink="false">1793546659345009</guid>
+      <pubDate>Sun, 01 Nov 2026 15:25:46 GMT</pubDate>
+    </item>
+    <item>
+      <title>পরবর্তী ২-৩ ঘণ্টায় পশ্চিম মেদিনীপুর ও ঝাড়গ্রামের কিছু অংশে বজ্রবিদ্যুৎ সহ হালকা থেকে মাঝারি বৃষ্টি এবং ৩০-৪০ কিমি বেগে দমকা হাওয়া বইতে পারে। (সময়: ২০:২০, ০১-১১-২০২৬)</title>
+      <description/>
+      <category>Met</category>
+      <link>https://sachet.ndma.gov.in/cap_public_website/FetchXMLFile?identifier=1793545535572017</link>
+      <author>controlroom@ndma.gov.in (IMD Kolkata)</author>
+      <guid isPermaLink="false">1793545535572017</guid>
+      <pubDate>Sun, 01 Nov 2026 15:09:19 GMT</pubDate>
+    </item>
+    <item>
+      <title>Flood warning: river Periyar above danger level at Aluva (constructed test item)</title>
+      <description></description>
+      <category>Met</category>
+      <link>https://sachet.ndma.gov.in/cap_public_website/FetchXMLFile?identifier=TEST-FLOOD-0001</link>
+      <author>controlroom@ndma.gov.in (Kerala SDMA)</author>
+      <guid>TEST-FLOOD-0001</guid>
+      <pubDate>Sun, 01 Nov 2026 16:05:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

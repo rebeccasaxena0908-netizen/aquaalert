@@ -1,6 +1,7 @@
 """AquaAlert dashboard. Run from the repo root: streamlit run dashboard/app.py"""
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -69,21 +70,90 @@ html(T.theme_css(paused))
 html(T.sky_html())
 
 settings = get_settings()
-st.sidebar.markdown('<span class="aa-label">Data</span>', unsafe_allow_html=True)
-path = st.sidebar.text_input("Dataset(s) (CSV/JSON/JSONL, comma-separated)", settings.dataset)
-try:
-    posts = _processed(path)
-except (FileNotFoundError, ValueError) as exc:
-    st.error(f"Could not load dataset: {exc}")
-    st.stop()
-if not posts:
-    st.warning("Dataset has no usable posts.")
-    st.stop()
+
+
+# ---------- live store + background poller (Live mode only) ----------
+def _live_db_path() -> str:
+    from aquaalert.ingest.live import DB_PATH
+
+    return str(os.getenv("AQUAALERT_LIVE_DB") or DB_PATH)
+
+
+@st.cache_resource
+def _live_store(path: str):
+    """Cached per database path, so a different AQUAALERT_LIVE_DB never reuses another store."""
+    from aquaalert.ingest.live import LiveStore
+
+    return LiveStore(path)
+
+
+@st.cache_resource
+def _poller_thread(path: str):
+    """One background poller per server process and database. AQUAALERT_LIVE_POLL=off disables it (tests, offline demos)."""
+    if os.getenv("AQUAALERT_LIVE_POLL", "on").lower() in ("off", "0", "false"):
+        return None
+    import threading
+
+    from aquaalert.ingest.live import Poller
+
+    stop = threading.Event()
+    t = threading.Thread(target=Poller(_live_store(path)).run_forever, args=(stop,), daemon=True, name="aquaalert-live")
+    t.start()
+    return stop
+
+
+@st.cache_data(show_spinner="Classifying and geocoding live posts...", max_entries=8)
+def _processed_live(key: tuple, _posts: list):
+    return process_posts(_posts, _classifier(), Geocoder())
+
+
+MODES = {
+    "sample": ("REPLAY · Kerala Aug 2018 sample", ("replay", "synthetic")),
+    "live": ("LIVE · NDMA SACHET, news, Bluesky", ("live",)),
+    "custom": ("REPLAY · your dataset file(s)", ("replay",)),
+}
+st.sidebar.markdown('<span class="aa-label">Dataset</span>', unsafe_allow_html=True)
+default_mode = os.getenv("AQUAALERT_MODE", "sample")
+mode = st.sidebar.radio("Dataset", list(MODES), index=list(MODES).index(default_mode) if default_mode in MODES else 0,
+                        format_func=lambda m: MODES[m][0], label_visibility="collapsed")
+html("".join(T.dataset_chip(k) + " " for k in MODES[mode][1]))
+official_alerts: list = []
+live_status: dict = {}
+live_counts: dict = {}
+live_updated = None
+window_h = 24
+if mode == "live":
+    from datetime import datetime, timedelta, timezone
+
+    from aquaalert.ingest.live import SOURCES, to_posts
+
+    store = _live_store(_live_db_path())
+    _poller_thread(_live_db_path())
+    window_h = st.sidebar.select_slider("Live window (hours)", [6, 12, 24, 48], value=24)
+    now_utc = datetime.now(timezone.utc)
+    items = store.items(since=now_utc - timedelta(hours=window_h))
+    official_alerts = [i for i in items if i.kind == "official_alert"]
+    live_counts = {s: sum(1 for i in items if i.source == s) for s in SOURCES}  # real sources only
+    live_status, live_updated = store.status(), store.last_updated()
+    raw_posts = to_posts(items)
+    posts = _processed_live(tuple((p.id, p.text) for p in raw_posts), raw_posts) if raw_posts else []
+    replay_at = now_utc.replace(tzinfo=None)  # live: everything up to now (UTC)
+else:
+    path = settings.dataset if mode == "sample" else st.sidebar.text_input(
+        "Dataset file(s) (CSV/JSON/JSONL, comma-separated)", settings.dataset)
+    try:
+        posts = _processed(path)
+    except (FileNotFoundError, ValueError) as exc:
+        st.error(f"Could not load dataset: {exc}")
+        st.stop()
+    if not posts:
+        st.warning("Dataset has no usable posts.")
+        st.stop()
 
 st.sidebar.markdown('<span class="aa-label">Filters</span>', unsafe_allow_html=True)
 labels = st.sidebar.multiselect("Categories", list(LABEL_COLORS), default=[l for l in LABEL_COLORS if l != "irrelevant"])
 min_conf = st.sidebar.slider("Min confidence", 0.0, 1.0, 0.0, 0.05)
-languages = sorted({p.language or "und" for p in posts})
+languages = sorted({p.language or "und" for p in posts}) or ["en"]
 lang_pick = st.sidebar.multiselect("Languages", languages, default=languages)
 hide_doubtful = st.sidebar.checkbox("Hide low-credibility posts", value=False,
                                     help="Heuristic misinformation score, not a trained model (see README)")
@@ -95,11 +165,12 @@ def credible(p) -> bool:
     return not hide_doubtful or (p.misinfo_score or 0) < max_misinfo
 
 
-# Replay: reveal posts up to a simulated clock, like a live feed.
-times = [p.timestamp for p in posts]
-replay_at = st.sidebar.slider(
-    "Replay time", min_value=min(times), max_value=max(times), value=max(times), format="MMM D, HH:mm",
-)
+if mode != "live":
+    # Replay: reveal posts up to a simulated clock, like a live feed.
+    times = [p.timestamp for p in posts]
+    replay_at = st.sidebar.slider(
+        "Replay time", min_value=min(times), max_value=max(times), value=max(times), format="MMM D, HH:mm",
+    )
 st.sidebar.caption(f"Classifier: `{_classifier().name}`")
 
 visible = [
@@ -121,12 +192,52 @@ except ValueError as exc:
     provider, provider_error = TemplateProvider(), str(exc)
 
 # ---------- header + KPIs ----------
+if mode != "live":
+    clock_chip = f"Replay · {replay_at:%d %b %Y %H:%M}"
+elif live_updated:
+    clock_chip = f"Live · updated {live_updated:%d %b %H:%M} UTC"
+elif any(v.get("state") in ("error", "blocked") for v in live_status.values()):
+    clock_chip = "Live · last poll failed"
+else:
+    clock_chip = "Live · waiting for first poll"
 html(T.header_html([
-    (f"Replay · {replay_at:%d %b %Y %H:%M}", True),
+    (clock_chip, True),
     (f"{len(languages)} languages", False),
     (_classifier().name.split(":")[-1], False),
     ("LLM: " + (provider.name if provider.uses_network else "offline"), False),
 ]))
+
+if mode == "live":
+    # per-source status + counts (simulated posts are never counted here)
+    cards = []
+    for src, label in (("sachet", "NDMA SACHET alerts"), ("news", "News (GDELT)"), ("bluesky", "Bluesky posts")):
+        stt = live_status.get(src, {})
+        state = stt.get("state") or "not polled yet"
+        kind = {"ok": "ok", "error": "warn", "blocked": "warn"}.get(state, "neu")
+        note = stt.get("last_error") or (f"last success {stt['last_success'][11:16]} UTC" if stt.get("last_success") else "")
+        if src == "bluesky" and state == "not configured":
+            note = "add BLUESKY_HANDLE and BLUESKY_APP_PASSWORD to .env"
+        cards.append(f'<div class="aa-glass aa-source-card" data-source="{src}" data-count="{live_counts.get(src, 0)}">'
+                     f'<span class="aa-label">{T.esc(label)}</span><span class="aa-big">{live_counts.get(src, 0)}</span>'
+                     f'<div>{T.badge(state, kind)}</div><span class="aa-kpi-note">{T.esc(note)}</span></div>')
+    html(f'<div class="aa-sources-row">{"".join(cards)}</div>')
+    real_flood_posts = [p for p in posts if p.source != "simulated"]
+    if not real_flood_posts and not official_alerts:
+        html('<div class="aa-glass aa-empty"><div class="aa-panel-title">No flood-related items in the last '
+             f'{window_h}h</div>Nothing from SACHET, news or Bluesky passed the flood filter in this window. '
+             'This view is never padded with sample data; switch the dataset to Replay to explore the 2018 sample.</div>')
+
+    @st.fragment(run_every="30s")
+    def _auto_refresh():
+        """Rerun the page when the poller stored something new (checked every 30 s)."""
+        snapshot = (len(store.items(since=datetime.now(timezone.utc) - timedelta(hours=window_h))),
+                    str(store.last_updated()))
+        if st.session_state.get("live_snapshot") not in (None, snapshot):
+            st.session_state["live_snapshot"] = snapshot
+            st.rerun(scope="app")
+        st.session_state["live_snapshot"] = snapshot
+
+    _auto_refresh()
 df = posts_to_frame(visible)
 mapped = int(df["lat"].notna().sum()) if len(df) else 0
 rescue = [p for p in analysed if p.label and p.label.value == "rescue_needed"]
@@ -164,14 +275,14 @@ with tab_map:
                  + "</div>")
     html(T.section("Posts", f"{len(df)} posts · newest first · click a column to sort"))
     if len(df):
-        cols = ["time", "label", "confidence", "language", "location", "misinfo", "rule", "people", "phones", "text",
-                "misinfo_reasons", "model_label", "id"]
+        cols = ["time", "source", "label", "confidence", "language", "location", "misinfo", "rule", "people", "phones",
+                "text", "link", "misinfo_reasons", "model_label", "id"]
         st.dataframe(
             # blank cells instead of "None" for the optional columns
             # blank cells instead of "None"; people as text so a blank and a number can share the column
             df.sort_values("time", ascending=False)[cols]
             .assign(people=lambda d: d["people"].map(lambda v: "" if pd.isna(v) else str(int(v))))
-            .fillna({"rule": "", "model_label": "", "location": "", "misinfo_reasons": ""}),
+            .fillna({"rule": "", "model_label": "", "location": "", "misinfo_reasons": "", "source": "", "link": ""}),
             width="stretch", hide_index=True,
             column_config={
                 "time": st.column_config.DatetimeColumn("time", format="D MMM, HH:mm"),
@@ -180,6 +291,8 @@ with tab_map:
                                                            help="Heuristic misinformation score (0 = no red flags)"),
                 "text": st.column_config.TextColumn("text", width="large"),
                 "misinfo_reasons": st.column_config.TextColumn("misinfo reasons", width="medium"),
+                "source": st.column_config.TextColumn("source", help="where the post came from"),
+                "link": st.column_config.LinkColumn("link", display_text="open ↗"),
             },
         )
 
@@ -188,8 +301,28 @@ with tab_warn:
     html(T.section(f"Early warnings · {replay_day:%d %b %Y}",
                    "WARNING = rescue/damage posts spike and rain ≥ 115.6 mm or a river above danger level; "
                    "WATCH = only one holds. Sample sensor files are synthetic (see README)."))
+    html(T.section("Official alerts", "NDMA SACHET CAP alerts (IMD, CWC, state SDMAs) — shown as issued, separate "
+                   "from AquaAlert's own post-volume warnings below"))
+    if mode != "live":
+        st.caption("Official alerts are only fetched in Live mode (SACHET has no alerts for the 2018 replay).")
+    elif not official_alerts:
+        st.caption(f"No flood, heavy-rain or river alerts from SACHET in the last {window_h}h.")
+    for a in official_alerts:
+        e = a.extra
+        meta = " · ".join(x for x in (e.get("sender"), e.get("area") and f"Area: {e['area']}",
+                                      e.get("effective") and f"{e['effective'][:16].replace('T', ' ')} → "
+                                      f"{(e.get('expires') or '')[:16].replace('T', ' ')}") if x)
+        body = (f'<div class="aa-alert-meta">{T.esc(meta)}</div><p>{T.esc(e.get("headline") or a.text)}</p>'
+                + (f'<p><b>Instruction:</b> {T.esc(e["instruction"])}</p>' if e.get("instruction") else "")
+                + f'<a class="aa-label" href="{T.esc(a.url)}" target="_blank" rel="noopener noreferrer">CAP source ↗</a>')
+        html(T.card(f'{T.official_badge()}{T.severity_badge(e.get("severity", ""))}'
+                    f'<span class="aa-panel-title">{T.esc(e.get("event") or "Alert")}</span>', body))
+    html(T.section("AquaAlert warnings", "post-volume spike × sensor thresholds"))
     if not readings:
         st.warning("No sensor CSVs found in data/sensors/ — warnings use post volume only.")
+    elif mode == "live" and not any(d == replay_day for _, d in readings):
+        st.caption("The sensor files in data/sensors/ do not cover today, so live warnings use post volume only "
+                   "(a spike alone is a WATCH).")
     html(T.kpi_html([
         {"key": "warnings_tab", "label": "Warnings", "value": n_warn, "tone": "err" if n_warn else "",
          "note": "spike + sensor threshold"},
@@ -254,7 +387,8 @@ with tab_brief:
                     if b.dropped_citations:
                         st.warning(f"Removed citations to unknown posts: {', '.join(b.dropped_citations)}")
                     sources = "".join(
-                        f'<div class="aa-source">{T.tag(s.id)}{T.label_badge(s.label)} '
+                        f'<div class="aa-source">{T.tag(s.id)}{T.source_badge(s.source) if s.source in T.SOURCE_LABELS else ""}'
+                        f'{T.label_badge(s.label)} '
                         + (f'<a href="{T.esc(s.url)}" target="_blank">link</a> ' if s.url else "")
                         + f"{T.esc(s.text)}</div>" for s in b.sources)
                     html(f'<span class="aa-label">Sources</span><div class="aa-sources">{sources}</div>')

@@ -169,3 +169,60 @@ def test_brief_shows_phone_redaction_marker(monkeypatch):
     day.set_value(next(o for o in day.options if "2018-08-15" in str(o))).run()  # the day with Chengannur's SOS
     briefs = [md.value for e in at.expander if "rescue request" in e.label for md in e.markdown]
     assert any("&lt;phone&gt;" in b for b in briefs)  # rendered as the visible text "<phone>"
+
+
+# ---------------------------------------------------------------- Live mode (no network: poller off, temp DB)
+def live_app(monkeypatch, tmp_path):
+    for key in ("GEMINI_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
+        monkeypatch.setenv(key, "")
+    monkeypatch.setenv("AQUAALERT_MODE", "live")
+    monkeypatch.setenv("AQUAALERT_LIVE_POLL", "off")
+    monkeypatch.setenv("AQUAALERT_LIVE_DB", str(tmp_path / "live.sqlite"))
+    monkeypatch.setenv("AQUAALERT_CLASSIFIER", "zeroshot")
+    return tmp_path / "live.sqlite"
+
+
+def source_counts(at) -> dict[str, int]:
+    return {k: int(v) for k, v in re.findall(r'data-source="(\w+)" data-count="(\d+)"', page_html(at))}
+
+
+def test_live_mode_empty_state_never_pads_with_samples(monkeypatch, tmp_path):
+    live_app(monkeypatch, tmp_path)
+    at = AppTest.from_file(str(APP), default_timeout=120).run()
+    html = page_html(at)
+    assert not at.exception and "No flood-related items in the last 24h" in html
+    assert kpis(at)["posts"] == 0 and source_counts(at) == {"sachet": 0, "news": 0, "bluesky": 0}
+    assert 'class="aa-ds aa-ds-live"' in html and 'class="aa-ds aa-ds-synthetic"' not in html
+
+
+def test_live_mode_sources_and_official_alerts(monkeypatch, tmp_path):
+    from datetime import datetime, timedelta, timezone
+
+    from aquaalert.ingest.live import LiveItem, LiveStore, parse_cap
+
+    db = live_app(monkeypatch, tmp_path)
+    now = datetime.now(timezone.utc)
+    cap = parse_cap((Path(__file__).parent / "fixtures" / "live" / "sachet_cap_flood.xml").read_bytes())
+    LiveStore(db).add([
+        LiveItem(id="sachet:T1", source="sachet", kind="official_alert", text=cap["headline"],
+                 url="https://sachet.ndma.gov.in/x", published_at=now - timedelta(hours=1), extra=cap),
+        LiveItem(id="news:N1", source="news", kind="news", text="Heavy rain triggers flood alert in Aluva, schools shut",
+                 url="https://example-news.in/a", published_at=now - timedelta(hours=2), lang="en"),
+        LiveItem(id="news:OLD", source="news", kind="news", text="Flood in Aluva last week", url="https://x/old",
+                 published_at=now - timedelta(days=3)),  # outside the 24 h window
+    ])
+    at = AppTest.from_file(str(APP), default_timeout=120).run()
+    html = page_html(at)
+    assert not at.exception and source_counts(at) == {"sachet": 1, "news": 1, "bluesky": 0}
+    assert "Official alert" in html and "Periyar river above danger level" in html and "CAP source" in html
+    assert "No flood-related items" not in html and kpis(at)["posts"] == 1
+
+
+
+def test_replay_sample_is_marked_synthetic(monkeypatch):
+    for key in ("GEMINI_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
+        monkeypatch.setenv(key, "")
+    at = AppTest.from_file(str(APP), default_timeout=120).run()
+    html = page_html(at)
+    assert 'class="aa-ds aa-ds-replay"' in html and 'class="aa-ds aa-ds-synthetic"' in html
+    assert 'class="aa-ds aa-ds-live"' not in html

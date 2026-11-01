@@ -66,3 +66,20 @@
   .aa-big { font-size: 26px; }
   .block-container { padding-left: 1rem; padding-right: 1rem; }
 }
+
+/* ---------- live mode: sources, datasets, official alerts, simulated posts ---------- */
+.aa-sim { color: #4A3B8C; background: #fff; border: 1.5px dashed #6A58B8; letter-spacing: .08em; }
+.aa-official { color: #fff; background: var(--navy); border-color: var(--navy); letter-spacing: .04em; }
+.aa-ds { display: inline-flex; align-items: center; gap: 6px; font-family: var(--f-head); font-weight: 700; font-size: 10.5px;
+  letter-spacing: .14em; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--rule); }
+.aa-ds-live { color: #fff; background: var(--navy); border-color: var(--navy); }
+.aa-ds-live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #9BE3C4;
+  box-shadow: 0 0 0 3px rgba(155,227,196,.35); }
+.aa-ds-replay { color: var(--navy); background: var(--ice); }
+.aa-ds-synthetic { color: #4A3B8C; background: #fff; border: 1.5px dashed #6A58B8; }
+.aa-sources-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 4px 0 14px; }
+.aa-source-card { display: flex; flex-direction: column; gap: 4px; }
+.aa-source-card .aa-big { font-size: 26px; }
+.aa-empty { text-align: center; padding: 26px 20px; color: var(--ink-soft); }
+.aa-empty .aa-panel-title { margin-bottom: 6px; }
+.aa-alert-meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--muted-text); margin: 4px 0 6px; }

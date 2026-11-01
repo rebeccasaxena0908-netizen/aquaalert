@@ -1,0 +1,12 @@
+{"_comment": "Constructed test fixture in the app.bsky.feed.searchPosts response format (no Bluesky credentials during development).",
+ "posts": [
+  {"uri": "at://did:plc:test1/app.bsky.feed.post/3kabc111", "cid": "c1", "author": {"did": "did:plc:test1", "handle": "resident.example.bsky.social"},
+   "record": {"$type": "app.bsky.feed.post", "text": "Water entering houses near Aluva, flood getting worse, we are on the terrace", "createdAt": "2026-11-01T15:40:00.000Z", "langs": ["en"]},
+   "indexedAt": "2026-11-01T15:40:02.000Z"},
+  {"uri": "at://did:plc:test2/app.bsky.feed.post/3kabc222", "cid": "c2", "author": {"did": "did:plc:test2", "handle": "food.example.bsky.social"},
+   "record": {"$type": "app.bsky.feed.post", "text": "Best biryani in Kochi tonight", "createdAt": "2026-11-01T15:10:00.000Z", "langs": ["en"]},
+   "indexedAt": "2026-11-01T15:10:01.000Z"},
+  {"uri": "at://did:plc:test3/app.bsky.feed.post/3kabc333", "cid": "c3", "author": {"did": "did:plc:test3", "handle": "malayali.example.bsky.social"},
+   "record": {"$type": "app.bsky.feed.post", "text": "ചാലക്കുടിയിൽ വെള്ളപ്പൊക്കം, റോഡ് മുങ്ങി", "createdAt": "2026-11-01T14:20:00.000Z", "langs": ["ml"]},
+   "indexedAt": "2026-11-01T14:20:05.000Z"}
+ ]}

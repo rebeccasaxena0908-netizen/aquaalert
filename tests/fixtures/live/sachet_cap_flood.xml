@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Constructed test fixture in the structure of a real SACHET CAP 1.2 alert (see sachet_cap_thunderstorm.xml). -->
+<alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">
+  <identifier>IN-TEST-FLOOD-0001</identifier>
+  <sender>Kerala-SDMA</sender>
+  <sent>2026-11-01T21:30:00+05:30</sent>
+  <status>Actual</status>
+  <msgType>Alert</msgType>
+  <scope>Public</scope>
+  <info>
+    <language>en-IN</language>
+    <category>Met</category>
+    <event>Flood</event>
+    <urgency>Immediate</urgency>
+    <severity>Severe</severity>
+    <certainty>Observed</certainty>
+    <effective>2026-11-01T21:30:00+05:30</effective>
+    <expires>2026-11-02T09:30:00+05:30</expires>
+    <senderName>Kerala State Disaster Management Authority</senderName>
+    <headline>Periyar river above danger level at Aluva; low-lying areas may flood</headline>
+    <description>Water level at Aluva has crossed the danger level of 10.2 m.</description>
+    <instruction>Residents of low-lying areas along the Periyar should move to relief camps.</instruction>
+    <area><areaDesc>Ernakulam district: Aluva, Paravur</areaDesc></area>
+  </info>
+  <info>
+    <language>ml</language>
+    <category>Met</category>
+    <event>Flood</event>
+    <urgency>Immediate</urgency>
+    <severity>Severe</severity>
+    <certainty>Observed</certainty>
+    <headline>ആലുവയിൽ പെരിയാർ അപകടനിലയ്ക്ക് മുകളിൽ</headline>
+    <area><areaDesc>എറണാകുളം</areaDesc></area>
+  </info>
+</alert>

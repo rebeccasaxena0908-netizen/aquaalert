@@ -34,6 +34,7 @@ class SourceRef(BaseModel):
     label: str
     text: str
     url: str | None = None  # None when the dataset has no link (e.g. the synthetic sample)
+    source: str | None = None  # sachet | news | bluesky | simulated | sample file name
 
 
 class DistrictBrief(BaseModel):
@@ -136,7 +137,7 @@ def summarize_district(brief: BriefInput, shown: list[Post], provider: Provider,
     source_posts = [by_id[i] for i in cited] or shown[:3]  # uncited summary: fall back to the top posts
     return DistrictBrief(
         district=brief.district, date=date.fromisoformat(brief.date), summary=text, counts=brief.counts,
-        sources=[SourceRef(id=p.id, label=p.label.value, text=p.text, url=p.url) for p in source_posts],
+        sources=[SourceRef(id=p.id, label=p.label.value, text=p.text, url=p.url, source=p.source) for p in source_posts],
         provider=provider.name, model=provider.model, cached=cached, dropped_citations=dropped,
     )
 

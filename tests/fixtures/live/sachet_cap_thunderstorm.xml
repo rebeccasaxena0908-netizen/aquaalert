@@ -1,0 +1,63 @@
+<cap:alert xmlns:cap="urn:oasis:names:tc:emergency:cap:1.2">
+<cap:identifier>IN-1793546659345009_9</cap:identifier>
+<cap:sender>Uttarakhand-SDMA</cap:sender>
+<cap:sent>2026-11-01T20:55:45+05:30</cap:sent>
+<cap:status>Actual</cap:status>
+<cap:msgType>Update</cap:msgType>
+<cap:scope>Public</cap:scope>
+<cap:restriction/>
+<cap:addresses/>
+<cap:note/>
+<cap:references>IMD-Dehradun,IN-1793546659345009_65,2026-11-01T20:53:54+05:30</cap:references>
+<cap:incidents/>
+<cap:info>
+<cap:language>en-IN</cap:language>
+<cap:category>Met</cap:category>
+<cap:event>Thunderstorm with Lightning</cap:event>
+<cap:urgency>Expected</cap:urgency>
+<cap:severity>Moderate</cap:severity>
+<cap:certainty>Likely</cap:certainty>
+<cap:audience>1</cap:audience>
+<cap:effective>2026-11-01T20:50:00+05:30</cap:effective>
+<cap:onset>2026-11-01T20:55:45+05:30</cap:onset>
+<cap:expires>2026-11-01T23:50:00+05:30</cap:expires>
+<cap:headline>Light to moderate rain accompanied with thunder/lightning/gusty wind(30-40kmph) is very likely to occur at isolated places over Bageshwar, Chamoli, Pithoragarh, Rudraprayag, Tehri Garhwal, Uttarkashi in next 3 hours.</cap:headline>
+<cap:description/>
+<cap:instruction>Please follow SDMA guidelines.</cap:instruction>
+<cap:contact/>
+<cap:parameter>
+<cap:valueName>Polygon URL</cap:valueName>
+<cap:value>https://sachet.ndma.gov.in/cap_public_website/FetchPolygonXMLFile?identifier=1793546659345009</cap:value>
+</cap:parameter>
+<cap:area>
+<cap:areaDesc>At isolated places</cap:areaDesc>
+<cap:altitude>0</cap:altitude>
+<cap:ceiling>0</cap:ceiling>
+</cap:area>
+</cap:info>
+<cap:info>
+<cap:language>HI</cap:language>
+<cap:category>Met</cap:category>
+<cap:event>Thunderstorm with Lightning</cap:event>
+<cap:urgency>Expected</cap:urgency>
+<cap:severity>Moderate</cap:severity>
+<cap:certainty>Likely</cap:certainty>
+<cap:audience>1</cap:audience>
+<cap:effective>2026-11-01T20:50:00+05:30</cap:effective>
+<cap:onset>2026-11-01T20:55:45+05:30</cap:onset>
+<cap:expires>2026-11-01T23:50:00+05:30</cap:expires>
+<cap:headline>कहीं-कहीं हल्की से मध्यम वर्षा के साथ गर्जन /आकाशीय बिजली चमकने / झोंकेदार हवाएं (30-40 kmph) चलने की संभावना है।</cap:headline>
+<cap:description/>
+<cap:instruction>Please follow SDMA guidelines.</cap:instruction>
+<cap:contact/>
+<cap:parameter>
+<cap:valueName>Polygon URL</cap:valueName>
+<cap:value>https://sachet.ndma.gov.in/cap_public_website/FetchPolygonXMLFile?identifier=1793546659345009</cap:value>
+</cap:parameter>
+<cap:area>
+<cap:areaDesc>At isolated places</cap:areaDesc>
+<cap:altitude>0</cap:altitude>
+<cap:ceiling>0</cap:ceiling>
+</cap:area>
+</cap:info>
+</cap:alert>

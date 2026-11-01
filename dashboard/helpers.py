@@ -44,6 +44,9 @@ MAP_CSS = """
 .aa-warn { color: #8D611E; background: #FAF3E8; border-color: rgba(201,138,43,.3); }
 .aa-ok { color: #27755A; background: #EAF4F0; border-color: rgba(47,143,110,.3); }
 .aa-neu { color: #3D4A59; background: #E7F0FA; border-color: #B7CCE6; }
+.aa-sim { color: #4A3B8C; background: #fff; border: 1.5px dashed #6A58B8; letter-spacing: .08em; }
+.aa-pop-link { font-family: 'Montserrat', system-ui, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: #35659E; }
 .leaflet-tooltip { font-family: 'Karla', system-ui, sans-serif; font-size: 12.5px; color: #212936;
   background: rgba(252,253,255,.97); border: 1px solid #B7CCE6; border-radius: 8px; box-shadow: 0 4px 12px rgba(45,85,135,.15); }
 </style>
@@ -70,6 +73,8 @@ def posts_to_frame(posts: list[Post]) -> pd.DataFrame:
                 "misinfo_reasons": "; ".join(p.misinfo_reasons),
                 "rule": p.rule,
                 "model_label": p.model_label.value if p.model_label else None,
+                "source": "SIMULATED" if p.source == "simulated" else p.source,
+                "link": p.url,
                 "location": ex.geo_source if ex else None,
                 "lat": ex.geo.lat if ex and ex.geo else None,
                 "lon": ex.geo.lon if ex and ex.geo else None,
@@ -116,13 +121,17 @@ def build_map(posts: list[Post], warnings: list | None = None) -> folium.Map:
             continue
         dlat, dlon = jitter(p.id)
         # post text is untrusted: always escaped before it goes into the popup HTML
-        from dashboard.theme import cred_badge, label_badge, rule_badge  # local: theme imports nothing from here
+        from dashboard.theme import cred_badge, label_badge, rule_badge, source_badge  # local: no import cycle
 
         popup = (f'<div class="aa-pop-title">{html.escape(p.label.value.replace("_", " "))}</div>'
                  f'<div class="aa-pop-meta">{p.label_score:.0%} confidence · {html.escape(p.language or "und")} · '
                  f'{html.escape(p.id)}</div>{html.escape(p.text)}'
-                 f'<div>{label_badge(p.label.value)}{rule_badge(p.rule)}'
+                 f'<div>{source_badge(p.source) if p.source in ("sachet", "news", "bluesky", "simulated") else ""}'
+                 f'{label_badge(p.label.value)}{rule_badge(p.rule)}'
                  f'{cred_badge(p.misinfo_score, FLAG_THRESHOLD)}</div>')
+        if p.url:
+            popup += (f'<div><a class="aa-pop-link" href="{html.escape(p.url, quote=True)}" target="_blank" '
+                      f'rel="noopener noreferrer">open original ↗</a></div>')
         if p.rule:
             popup += f'<div class="aa-pop-meta">the classifier said {html.escape(p.model_label.value)}; a distress rule overrode it</div>'
         flagged = (p.misinfo_score or 0) >= FLAG_THRESHOLD

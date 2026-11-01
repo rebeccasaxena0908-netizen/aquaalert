@@ -1,0 +1,6 @@
+{"_comment": "Constructed test fixture in the GDELT DOC 2.0 artlist JSON format (live GDELT was rate-limiting during development).",
+ "articles": [
+  {"url": "https://example-news.in/kerala/heavy-rain-flood-alert-ernakulam", "url_mobile": "", "title": "Heavy rain triggers flood alert in Ernakulam, schools shut", "seendate": "20261101T143000Z", "socialimage": "", "domain": "example-news.in", "language": "English", "sourcecountry": "India"},
+  {"url": "https://example-news.in/sports/cricket-final", "url_mobile": "", "title": "India win cricket final in Kochi", "seendate": "20261101T120000Z", "socialimage": "", "domain": "example-news.in", "language": "English", "sourcecountry": "India"},
+  {"url": "https://example-hindi.in/bihar-baadh", "url_mobile": "", "title": "बिहार में बाढ़ से कई गांव जलमग्न", "seendate": "20261101T101500Z", "socialimage": "", "domain": "example-hindi.in", "language": "Hindi", "sourcecountry": "India"}
+ ]}

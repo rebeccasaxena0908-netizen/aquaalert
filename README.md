@@ -22,7 +22,7 @@ language → classify → extract → credibility over a list of posts.
 
 | Module | Role | Key files | Needs |
 |---|---|---|---|
-| `ingest/` | Load CSV/JSON/JSONL datasets (auto-detected columns, several files at once); replay a dataset in time order as a live feed | `loader.py`, `replay.py` | – |
+| `ingest/` | Load CSV/JSON/JSONL datasets; replay a dataset in time order; **Live mode** polling of NDMA SACHET, GDELT news and Bluesky into SQLite | `loader.py`, `replay.py`, `live.py` | Bluesky app password optional |
 | `language/` | Language ID: native Indic scripts by Unicode block, romanised Hindi/Malayalam/Bengali by lexicon; code-mixing flag; per-language evaluation | `detect.py`, `evaluate.py` | – |
 | `classify/` | 7-class crisis classifier. Fine-tuned MuRIL → embed_lr baseline → keyword fallback (auto); distress rule layer; HumAID label mapping; training + evaluation | `model.py`, `rules.py`, `train.py`, `embed_lr.py`, `label_map.py` | MuRIL weights (`scripts/fetch_model.py`) optional |
 | `extract/` | Places (Latin + Malayalam/Devanagari/Bengali names), phones, people counts; offline gazetteer + cached Nominatim; district lookup | `entities.py`, `gazetteer.py`, `geocode.py` | – |
@@ -88,6 +88,43 @@ python -m aquaalert.classify.train --train ... --val ... --test ... --label-data
 ```
 With `AQUAALERT_CLASSIFIER=auto` the classifier is MuRIL if `models/muril/` exists, then `embed_lr`, then the
 keyword fallback.
+
+## Live mode (ingest/live.py)
+The sidebar **Dataset** selector marks every dataset: **LIVE** (polled sources), **REPLAY · SYNTHETIC** (the
+Kerala 2018 sample, all made up) or **REPLAY** (your own files). Live mode polls in a background thread every
+`AQUAALERT_LIVE_INTERVAL` seconds (default 600), stores everything in `data/cache/live.sqlite`, refreshes the page
+when something new arrives, and shows "last updated", per-source counts and status, a source badge and a link to the
+original on every post. When nothing flood-related arrived it says so ("No flood-related items in the last 24h") and
+never pads the view with sample data. CLI: `python -m aquaalert.ingest.live --once` or `--loop`.
+
+| Source | What | Access | Status (checked 2026-11-01) |
+|---|---|---|---|
+| **NDMA SACHET** | CAP 1.2 alerts from IMD, CWC and state SDMAs. Feeds: `https://sachet.ndma.gov.in/cap_public_website/rss/rss_<feed>.xml` for `india`, `kerala`, `assam`, `bihar`, `odisha`, `uttarakhand`, `karnataka`, `maharashtra`, `gujarat`; each item links to its CAP XML. Flood, heavy-rain and river alerts are kept (event, severity, urgency, area, sender, effective/expires, headline, instruction, link). | Public, no key; no robots.txt (404 = allowed) | **Verified live**: all 9 feeds fetched; 2 heavy-rain alerts kept (Andhra Pradesh SDMA, cyclone rain). Multi-word states (Tamil Nadu, West Bengal, …) returned 404 for every spelling tried, so they come only via the all-India feed. Slow at times (a full poll took ~3 min). |
+| **News (GDELT DOC 2.0)** | English and Hindi flood headlines from Indian sources, with real titles, links and times | Public, no key; ≤ 1 request / 5 s (enforced: 6 s gap) | **Not verified live**: rate-limited (HTTP 429) and later TLS timeouts during development; tested on a constructed response. |
+| **Bluesky** | `app.bsky.feed.searchPosts` for flood terms in English, Hindi, Malayalam (`sort=latest`, last 24 h) | Needs a login: unauthenticated search returns 403. Session via `com.atproto.server.createSession` on `bsky.social`, kept in memory only | **Not verified live** (no credentials here); tested on a constructed response. Skipped quietly when the credentials are missing. |
+| ~~Google News RSS~~ | – | **Not used**: `news.google.com/robots.txt` disallows `/` (incl. `/rss`) for generic agents | – |
+
+Politeness: every request checks robots.txt first (unreachable robots.txt = skip this poll; Python's robotparser
+applies the first matching rule, which is stricter than RFC 9309), keeps a minimum gap per host, and sends a
+descriptive User-Agent. Each source fails and backs off on its own (up to 6 h). Items are prefiltered with flood
+keywords (English, Hindi, Malayalam, Bengali, Marathi and romanised forms), deduplicated by id and by text, and keep
+their real publish time, source and URL. Phone numbers are redacted before any text reaches an LLM (briefs).
+
+**Adding Bluesky**: on bsky.app go to *Settings → Privacy and security → App passwords → Add App Password*, then put
+`BLUESKY_HANDLE=yourname.bsky.social` and `BLUESKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx` in `.env` (never your main
+password). Restart the dashboard.
+
+**Limits** — be honest about these when showing Live mode:
+- **Social data is sparse.** Outside a real flood there may be nothing for hours; Bluesky is small in India, and
+  X/Twitter (where 2018's posts were) is a paid API and not used.
+- **Headlines are not citizen posts.** News titles ("Heavy rain triggers flood alert in Ernakulam") are reports, so the
+  classifier mostly labels them *info update*; rescue requests, offers and missing-person posts come from social posts.
+- **Classifier shift.** MuRIL was trained on 2016-2019 disaster tweets (HumAID); 2026 headlines, Bluesky posts and other
+  regions differ in style and vocabulary, so expect lower accuracy than the HumAID numbers below.
+- **Geography.** The gazetteer covers ~35 Kerala places; posts from other states are listed but not mapped unless
+  Nominatim is enabled (`AQUAALERT_GEOCODE_ONLINE=true`). SACHET areas are often free text ("At isolated places").
+- **Warnings.** The bundled sensor files cover August 2018 only, so live warnings use post volume alone (a spike is a
+  WATCH); official SACHET alerts are shown separately as "Official alert" entries in the Warnings tab.
 
 ## Early warnings (fuse/)
 For each district and day, rescue + damage posts are counted (posts with a misinformation score ≥ 0.5 don't count) and

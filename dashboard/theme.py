@@ -142,3 +142,29 @@ def legend_html(colors: dict[str, str], counts: dict[str, int]) -> str:
                    f'{esc(l.replace("_", " "))}<span class="aa-count">{counts.get(l, 0)}</span></div>' for l, c in colors.items())
     rows += ('<div class="aa-legend-row"><span class="aa-dot aa-hollow"></span>doubtful (low credibility)</div>')
     return f'<div class="aa-glass aa-legend"><span class="aa-label">Legend</span>{rows}</div>'
+
+
+SOURCE_LABELS = {"sachet": "SACHET", "news": "NEWS", "bluesky": "BLUESKY", "simulated": "SIMULATED"}
+
+
+def source_badge(source: str | None) -> str:
+    """Where a post came from. SIMULATED gets its own dashed style (not a status colour)."""
+    if not source:
+        return ""
+    if source == "simulated":
+        return '<span class="aa-badge aa-sim">SIMULATED</span>'
+    return badge(SOURCE_LABELS.get(source, "SAMPLE"), "neu")
+
+
+def official_badge() -> str:
+    return '<span class="aa-badge aa-official">Official alert</span>'
+
+
+def severity_badge(severity: str) -> str:
+    sev = (severity or "").strip()
+    return badge(sev or "severity n/a", {"extreme": "err", "severe": "err", "moderate": "warn"}.get(sev.lower(), "neu"))
+
+
+def dataset_chip(kind: str) -> str:
+    """LIVE / REPLAY / SYNTHETIC marker for the dataset in use."""
+    return f'<span class="aa-ds aa-ds-{kind.lower()}">{esc(kind.upper())}</span>'
