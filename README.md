@@ -3,8 +3,9 @@
 Turns flood-time posts (English, Hindi/Hinglish, Bengali, Malayalam, Assamese) into classified
 help requests on a map. See [CLAUDE.md](CLAUDE.md) for the full architecture and roadmap.
 
-## Status: Phase 1
-`ingest -> classify -> extract(geo) -> Streamlit map`, runnable with no downloads or training.
+## Status: Phase 1 + Phase 3 quick wins
+`ingest -> classify -> extract(geo) -> summarize / match -> Streamlit`, runnable with no downloads, training or API keys
+(Phase 2, language and credibility, is not built yet).
 
 ## Quick start
 ```bash
@@ -22,6 +23,8 @@ pytest
 | `aquaalert/ingest/` | `loader.py` (CSV/JSON/JSONL), `replay.py` (time-ordered feed simulator) |
 | `aquaalert/classify/` | `zeroshot.py` keyword fallback, `model.py` backend selector, `train.py` MuRIL fine-tuning, `label_map.py` |
 | `aquaalert/extract/` | locations / phones / people counts, offline Kerala gazetteer, cached geocoder |
+| `aquaalert/summarize/` | district-wise daily brief (`brief.py`), providers: offline template, Anthropic, OpenAI-compatible (`providers.py`); cited sources, disk cache |
+| `aquaalert/match/` | needs-vs-offers matching: sentence-embedding cosine + haversine proximity (`matcher.py`, `geo.py`) |
 | `aquaalert/pipeline.py` | ingest -> classify -> extract |
 | `dashboard/` | Streamlit + Folium app |
 
@@ -34,6 +37,20 @@ python -m aquaalert.classify.train --data data/raw/humaid.csv --label-dataset hu
 Training writes the model and `metrics.json` (accuracy, macro-F1, per-class report) to `--out`.
 With `AQUAALERT_CLASSIFIER=auto` the dashboard uses the trained model if `AQUAALERT_MODEL_DIR` exists,
 otherwise the zero-shot keyword fallback.
+
+## Daily briefs
+Without a key the dashboard's **Daily brief** tab writes offline extractive summaries. For LLM summaries add one key to `.env`:
+- `ANTHROPIC_API_KEY` (default model `claude-haiku-5-5`), or
+- `OPENAI_API_KEY` (optional `OPENAI_BASE_URL` for compatible endpoints; default model `gpt-4o-mini`).
+
+`AQUAALERT_LLM_PROVIDER=auto` picks Anthropic, then OpenAI, then the template; `AQUAALERT_LLM_MODEL` overrides the model.
+Responses are cached in `data/cache/summaries.json`, citations to posts not in the input are stripped, and phone numbers are
+redacted from the text sent to the API. LLM calls only happen when you click **Generate briefs**. Posts only get a source
+link if the dataset has a `url` column (the synthetic sample has none).
+
+## Needs ↔ Offers
+`rescue_needed`/`need_supplies` posts are matched to nearby `offer_help` posts: `score = alpha * cosine + (1 - alpha) * (1 - km / max_km)`.
+Matching inherits classifier mistakes (e.g. a "need rescue" post labelled as an offer will be treated as an offer).
 
 ## Geocoding
 Offline gazetteer first, then (if `AQUAALERT_GEOCODE_ONLINE=true`) Nominatim bounded to Kerala. Results are

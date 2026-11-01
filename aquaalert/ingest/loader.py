@@ -13,6 +13,7 @@ from aquaalert.schemas import Label, Post
 TEXT_COLUMNS = ("text", "tweet_text", "content", "full_text")
 TIME_COLUMNS = ("timestamp", "created_at", "tweet_time", "date")
 ID_COLUMNS = ("id", "tweet_id")
+URL_COLUMNS = ("url", "link", "tweet_url")
 LABEL_COLUMNS = ("label", "class_label", "informativeness")
 
 
@@ -53,6 +54,7 @@ def load_posts(
     if text_col is None or time_col is None:
         raise ValueError(f"{path} needs a text column {TEXT_COLUMNS} and time column {TIME_COLUMNS}")
     id_col, label_col = _first(cols, ID_COLUMNS), _first(cols, LABEL_COLUMNS)
+    url_col = _first(cols, URL_COLUMNS)
 
     posts: list[Post] = []
     for i, row in df.iterrows():
@@ -69,6 +71,7 @@ def load_posts(
                 timestamp=ts.to_pydatetime(),
                 source=source or str(row.get("source") or path.stem),
                 author=(str(row["author"]) or None) if "author" in cols else None,
+                url=(str(row[url_col]).strip() or None) if url_col else None,
                 gold_label=map_label(str(row[label_col]), label_dataset, text) if label_col else None,
             )
         )

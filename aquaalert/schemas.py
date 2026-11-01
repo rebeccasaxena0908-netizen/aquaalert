@@ -33,6 +33,7 @@ class Extraction(BaseModel):
     people_count: int | None = None
     geo: GeoPoint | None = None
     geo_source: str | None = None  # the location string that was geocoded
+    district: str | None = None  # Kerala district of geo_source (gazetteer lookup)
 
 
 class Post(BaseModel):
@@ -41,6 +42,7 @@ class Post(BaseModel):
     timestamp: datetime
     source: str = "unknown"  # twitter, news, sample, ...
     author: str | None = None
+    url: str | None = None  # link to the original post/article, when the dataset has one
     language: str | None = None  # filled by language/ (Phase 2)
 
     # Ground-truth label when the dataset provides one (used for eval, not by stages)

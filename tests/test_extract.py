@@ -51,3 +51,15 @@ def test_extract_post(make_post, tmp_path):
     assert ex.locations == ["Aluva"] and ex.geo_source == "Aluva" and ex.geo
     assert ex.people_count == 8 and ex.phones == ["9895123456"]
     assert extract_post(make_post("hello"), g).extraction.geo is None
+
+
+def test_district_and_url(make_post, tmp_path, sample_path):
+    g = Geocoder(cache_path=tmp_path / "g.json", online=False)
+    assert extract_post(make_post("stuck in Chengannur"), g).extraction.district == "Alappuzha"
+    assert extract_post(make_post("Kochi roads flooded"), g).extraction.district == "Ernakulam"
+    assert extract_post(make_post("nothing"), g).extraction.district is None
+    from aquaalert.ingest.loader import load_posts
+
+    f = tmp_path / "u.csv"
+    f.write_text("id,text,timestamp,url\n1,hello,2018-08-15 01:00,https://example.org/1\n2,hi,2018-08-15 02:00,\n")
+    assert [p.url for p in load_posts(f)] == ["https://example.org/1", None]

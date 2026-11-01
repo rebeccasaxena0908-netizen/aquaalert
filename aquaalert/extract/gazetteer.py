@@ -37,3 +37,19 @@ KERALA_PLACES: dict[str, tuple[float, float]] = {
     "perumbavoor": (10.1130, 76.4750),
     "mullaperiyar": (9.5280, 77.1440),
 }
+
+DISTRICTS: tuple[str, ...] = (
+    "Thiruvananthapuram", "Kollam", "Pathanamthitta", "Alappuzha", "Kottayam", "Idukki", "Ernakulam",
+    "Thrissur", "Palakkad", "Malappuram", "Kozhikode", "Wayanad", "Kannur", "Kasaragod",
+)
+
+# place (lowercase) -> district; district names and Kochi map to themselves / Ernakulam.
+DISTRICT_OF: dict[str, str] = {
+    **{d.lower(): d for d in DISTRICTS},
+    "kochi": "Ernakulam", "chengannur": "Alappuzha", "aluva": "Ernakulam", "kuttanad": "Alappuzha",
+    "pandalam": "Pathanamthitta", "ranni": "Pathanamthitta", "aranmula": "Pathanamthitta",
+    "chalakudy": "Thrissur", "cheruthoni": "Idukki", "thiruvalla": "Pathanamthitta",
+    "paravur": "Ernakulam", "edathua": "Alappuzha", "kakkanad": "Ernakulam", "munnar": "Idukki",
+    "vythiri": "Wayanad", "shoranur": "Palakkad", "edappally": "Ernakulam", "vypin": "Ernakulam",
+    "perumbavoor": "Ernakulam", "mullaperiyar": "Idukki",
+}

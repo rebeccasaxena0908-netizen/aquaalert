@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-from aquaalert.extract.gazetteer import KERALA_PLACES
+from aquaalert.extract.gazetteer import DISTRICT_OF, KERALA_PLACES
 from aquaalert.extract.geocode import Geocoder
 from aquaalert.schemas import Extraction, Post
 
@@ -77,6 +77,7 @@ def extract_post(post: Post, geocoder: Geocoder | None = None) -> Post:
         people_count=extract_people_count(post.text),
         geo=geo,
         geo_source=geo_source,
+        district=DISTRICT_OF.get(geo_source.lower()) if geo_source else None,
     )
     return post.model_copy(update={"extraction": extraction})
 

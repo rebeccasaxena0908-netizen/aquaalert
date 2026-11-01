@@ -68,3 +68,21 @@ def build_map(posts: list[Post]) -> folium.Map:
             tooltip=f"{p.label.value} - {p.extraction.geo_source}",
         ).add_to(fmap)
     return fmap
+
+
+def build_match_map(matches: list, posts: list[Post]) -> folium.Map:
+    """Map with a line from each need (red) to its matched offer (green)."""
+    south, west, north, east = KERALA_BBOX
+    fmap = folium.Map(location=[(south + north) / 2, (west + east) / 2], zoom_start=7)
+    geo = {p.id: p.extraction.geo for p in posts if p.extraction and p.extraction.geo}
+    for m in matches:
+        n, o = geo.get(m.need_id), geo.get(m.offer_id)
+        if n is None or o is None:
+            continue
+        nd, od = jitter(m.need_id), jitter(m.offer_id)
+        npt, opt = [n.lat + nd[0], n.lon + nd[1]], [o.lat + od[0], o.lon + od[1]]
+        tip = f"{m.score:.2f} | {m.distance_km:.1f} km"
+        folium.PolyLine([npt, opt], color="#555", weight=2, dash_array="5", tooltip=tip).add_to(fmap)
+        folium.CircleMarker(npt, radius=7, color="red", fill=True, tooltip=f"NEED {m.need_id}: {m.need_text[:80]}").add_to(fmap)
+        folium.CircleMarker(opt, radius=7, color="green", fill=True, tooltip=f"OFFER {m.offer_id}: {m.offer_text[:80]}").add_to(fmap)
+    return fmap
