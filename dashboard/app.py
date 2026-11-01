@@ -199,7 +199,7 @@ if mode != "live":
     clock_chip = f"Replay · {replay_at:%d %b %Y %H:%M}"
 elif live_updated:
     clock_chip = f"Live · updated {live_updated:%d %b %H:%M} UTC"
-elif any(v.get("state") in ("error", "blocked") for v in live_status.values()):
+elif any(v.get("state") == "failed" for v in live_status.values()):
     clock_chip = "Live · last poll failed"
 else:
     clock_chip = "Live · waiting for first poll"
@@ -215,14 +215,17 @@ if mode == "live":
     cards = []
     for src, label in (("sachet", "NDMA SACHET alerts"), ("news", "News (GDELT)"), ("bluesky", "Bluesky posts")):
         stt = live_status.get(src, {})
-        state = stt.get("state") or "not polled yet"
-        kind = {"ok": "ok", "error": "warn", "blocked": "warn"}.get(state, "neu")
-        note = stt.get("last_error") or (f"last success {stt['last_success'][11:16]} UTC" if stt.get("last_success") else "")
-        if src == "bluesky" and state == "not configured":
-            note = "add BLUESKY_HANDLE and BLUESKY_APP_PASSWORD to .env"
-        cards.append(f'<div class="aa-glass aa-source-card" data-source="{src}" data-count="{live_counts.get(src, 0)}">'
-                     f'<span class="aa-label">{T.esc(label)}</span><span class="aa-big">{live_counts.get(src, 0)}</span>'
-                     f'<div>{T.badge(state, kind)}</div><span class="aa-kpi-note">{T.esc(note)}</span></div>')
+        state = stt.get("state") or "waiting"
+        kind = {"ok": "ok", "slow": "warn", "failed": "err", "skipped": "neu"}.get(state, "neu")
+        when = f"last success {stt['last_success'][11:16]} UTC" if stt.get("last_success") else "no successful poll yet"
+        took = f" · took {stt['duration']:.0f}s" if stt.get("duration") is not None else ""
+        detail = stt.get("note") or stt.get("last_error") or ""
+        cards.append(f'<div class="aa-glass aa-source-card" data-source="{src}" data-count="{live_counts.get(src, 0)}" '
+                     f'data-state="{T.esc(state)}"><span class="aa-label">{T.esc(label)}</span>'
+                     f'<span class="aa-big">{live_counts.get(src, 0)}</span><div>{T.badge(state, kind)}</div>'
+                     f'<span class="aa-kpi-note">{T.esc(when + took)}</span>'
+                     + (f'<span class="aa-kpi-note aa-muted">{T.esc(detail[:160])}</span>' if detail else "")
+                     + "</div>")
     html(f'<div class="aa-sources-row">{"".join(cards)}</div>')
     real_flood_posts = [p for p in posts if p.source != "simulated"]
     if not real_flood_posts and not official_alerts:
@@ -262,7 +265,8 @@ html(T.kpi_html([
     {"key": "posts", "label": "Posts analysed", "value": len(analysed), "tone": "accent",
      "note": f"{len(visible)} shown with current filters · {mapped} on the map"},
     {"key": "rescue", "label": "Rescue requests", "value": len(rescue), "tone": "err",
-     "note": f"{sum(1 for p in rescue if p.rule)} promoted by the distress rules"},
+     "note": f"{sum(1 for p in rescue if p.rule and p.model_label != p.label)} promoted by the distress rules"
+             + (f" · {n_conf} confirmed" if (n_conf := sum(1 for p in rescue if p.rule and p.model_label == p.label)) else "")},
     {"key": "warnings", "label": "Active warnings", "value": n_warn, "tone": "err" if n_warn else "",
      "note": f"+{n_watch} on watch · {replay_day:%d %b}"},
     {"key": "flagged", "label": "Low-credibility posts", "value": len(flagged), "tone": "warn" if flagged else "",

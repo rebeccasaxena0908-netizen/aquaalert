@@ -92,9 +92,11 @@ def cred_badge(score: float | None, threshold: float) -> str:
     return badge("no red flags", "ok")
 
 
-def rule_badge(rule: str | None) -> str:
+def rule_badge(rule: str | None, confirms: bool = False) -> str:
     """Neutral: the status colours are reserved for rescue/WARNING, WATCH/low credibility and OK."""
-    return badge(f"rule: {rule.replace('_', ' ')}", "neu") if rule else ""
+    if not rule:
+        return ""
+    return badge(f"rule: {rule.replace('_', ' ')}" + (" · confirms" if confirms else ""), "neu")
 
 
 def tag(text: str) -> str:

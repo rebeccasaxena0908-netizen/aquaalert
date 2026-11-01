@@ -246,3 +246,20 @@ def test_simulated_badge_in_popup_and_table(tmp_path):
     rendered = build_map(posts).get_root().render()
     assert rendered.count("aa-badge aa-sim") == sum(1 for p in posts if p.extraction and p.extraction.geo)
     assert set(posts_to_frame(posts)["source"]) == {"SIMULATED"}
+
+
+def test_live_source_cards_show_state_last_success_and_note(monkeypatch, tmp_path):
+    from aquaalert.ingest.live import LiveStore
+
+    db = live_app(monkeypatch, tmp_path)
+    st = LiveStore(db)
+    st.set_status("sachet", state="slow", last_success="2026-11-01T16:05:00+00:00", duration=118.0,
+                  note="time budget reached after 9 of 25 new CAP documents")
+    st.set_status("news", state="failed", last_error="rate limited by api.gdeltproject.org (HTTP 429)", duration=6.0)
+    st.set_status("bluesky", state="skipped", note="not configured (no BLUESKY_HANDLE / BLUESKY_APP_PASSWORD)")
+    at = AppTest.from_file(str(APP), default_timeout=120).run()
+    html = page_html(at)
+    states = dict(re.findall(r'data-source="(\w+)" data-count="\d+" data-state="(\w+)"', html))
+    assert not at.exception and states == {"sachet": "slow", "news": "failed", "bluesky": "skipped"}
+    assert "last success 16:05 UTC · took 118s" in html and "time budget reached" in html and "HTTP 429" in html
+    assert "aa-badge aa-err\">failed" in html and "aa-badge aa-warn\">slow" in html

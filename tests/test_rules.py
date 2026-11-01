@@ -105,11 +105,67 @@ def test_unambiguous_requests_still_fire_inside_appeal_wording():
     assert apply_rules("Boats needed at Edathua, thank you volunteers", INFO)[0] == RESCUE
 
 
-def test_only_offer_and_info_labels_are_overridden():
-    text = "Please help us, we are trapped"
-    for keep in (Label.NEED_SUPPLIES, Label.MISSING_PERSON, Label.INFRASTRUCTURE_DAMAGE, Label.IRRELEVANT, RESCUE):
-        assert apply_rules(text, keep) == (keep, None, None)
+def test_label_policy():
+    distress = "Please help us, we are trapped"
+    for keep in (Label.MISSING_PERSON, Label.INFRASTRUCTURE_DAMAGE):
+        assert apply_rules(distress, keep) == (keep, None, None)
+    assert apply_rules(distress, RESCUE) == (RESCUE, "distress_strong", None)  # confirms; keeps model score
+    assert apply_rules("we are trapped on the roof", Label.NEED_SUPPLIES)[0] == RESCUE  # situation, no supplies
+    assert apply_rules("Please send help to Dominican Republic. They need our help.", Label.NEED_SUPPLIES)[0] \
+        == Label.NEED_SUPPLIES  # ambiguous appeal: stays a request
+    assert apply_rules("we are trapped, need food and medicines", Label.NEED_SUPPLIES)[0] == Label.NEED_SUPPLIES
+    assert apply_rules("boats needed, we also need food", Label.NEED_SUPPLIES)[0] == RESCUE  # explicit beats supplies
+    assert apply_rules("we are stuck on the roof", Label.IRRELEVANT)[0] == Label.IRRELEVANT  # contextual: not enough
+    assert apply_rules("SOS boats needed at Aluva", Label.IRRELEVANT)[0] == RESCUE  # explicit: enough
 
+
+@pytest.mark.parametrize("text", [
+    # Hinglish
+    "Hum Chengannur me ghar ki chhat par phanse hain, 7 log hain, paani badh raha hai, jaldi boat bhejo",
+    "Hum fase hue hain Aluva mein, chhat pe hain, bachao",
+    "Mere ghar mein paani aa gaya, hum log doob rahe hain, madad chahiye",
+    "Humein nikalo yahan se, paani ghar mein ghus gaya hai",
+    "हम छत पर फंसे हैं, कृपया नाव भेजिए",
+    # Manglish
+    "Njangal veettil kudungi kidakkunnu, vellam kayari, pettennu sahayikkuka",
+    "Aluva il 5 per kudungiyirikkunnu, thoni venam, please help",
+    "ഞങ്ങൾ വീടിന്റെ മുകളിൽ കുടുങ്ങി കിടക്കുന്നു, ദയവായി ബോട്ട് അയക്കൂ",
+    # Banglish
+    "Amra Chengannur e ekta barir chhade atke achhi, jol barche, nouka pathan",
+    "Ami Alappuzha te ache, 6 jon manush bondi, nouka dorkar. Please help",
+    "আমরা ছাদে আটকে আছি, দয়া করে উদ্ধার করুন",
+])
+def test_romanised_and_native_distress_promoted(text):
+    for wrong in (OFFER, INFO, Label.NEED_SUPPLIES):
+        label, rule, conf = apply_rules(text, wrong)
+        assert label == RESCUE and rule and conf, (wrong, text)
+
+
+@pytest.mark.parametrize("text", [
+    # fundraising / thanks
+    "Kerala ke liye chanda dijiye, hum log bacha rahe hain, dhanyavad",
+    "Thanks to the Navy, hum chhat pe phanse the, sab bach gaye",
+    "Rescue team ne humein bacha liya, shukriya",
+    # past tense
+    "Hum kal raat chhat par phanse the, ab safe hain",
+    "Njangal innale kudungiyirunnu, ippol rakshappettu",
+    "Amra atke chhilam, ekhon bache gechi",
+    # rescuer wording / offers
+    "Hamare paas 3 naav hain, hum log logon ko bacha rahe hain, contact karo",
+    "Mere paas truck hai, Thrissur se khana le ja sakta hoon",
+    "Ente vandi undu, Kottayam il ninnu food ethikkam",
+    "Amader nouka ache, amra uddhar korchi, call korun",
+    "Ami Ernakulam e achhi, Bangla bolte pari, shromikder sahajyo korte parbo",
+    # supply request from a camp (not distress)
+    "Pandalam campil bhakshanam onnum kittunnilla, vellam venam",
+    "Kochi relief camp me dawai aur khana chahiye, bahut log hain yahan",
+    "Kochi camp e khabar ar oshudh dorkar, amader 40 jon manush",
+    # negation
+    "Ab boat ki zarurat nahi, paani utar gaya",
+])
+def test_romanised_non_distress_left_alone(text):  # noqa: D103
+    for label in (OFFER, INFO, Label.NEED_SUPPLIES):
+        assert apply_rules(text, label)[0] == label, (label, text)
 
 def test_strong_cue_beats_offer_guard_but_contextual_does_not():
     assert rescue_rule("Volunteers ready, but we need rescue ourselves, help us")[0] == "distress_strong"
@@ -130,3 +186,15 @@ def test_classify_posts_records_rule(make_post):
     assert (b.label, b.model_label, b.rule) == (OFFER, None, None)
     plain = classify_posts(posts, FixedOffer(), rules=False)
     assert all(p.label == OFFER and p.rule is None for p in plain)
+
+
+
+@pytest.mark.parametrize("text", [
+    "Modi is punishing Kerala with tiny aid #KeralaFloods #BJP_भगाओ_देश_बचाओ",
+    "Desh bachao, sarkar hatao! Kerala flood relief is a scam",
+    "#SaveUs trending again, celebrities post selfies",
+    "@rescue_us_now posted an update about the flood",
+])
+def test_hashtags_mentions_and_slogans_are_not_requests(text):
+    for label in (OFFER, INFO, Label.NEED_SUPPLIES, Label.IRRELEVANT):
+        assert apply_rules(text, label)[0] == label, (label, text)

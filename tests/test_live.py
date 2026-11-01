@@ -174,7 +174,8 @@ def test_missing_bluesky_credentials_skip_quietly(tmp_path, monkeypatch):
     poller = L.Poller(L.LiveStore(tmp_path / "l.sqlite"), fetcher(net), interval=600)
     assert poller.bluesky is None
     res = poller.poll_once(NOW, force=True)
-    assert res["bluesky"] == "not configured" and not any("bsky" in u for u, _, _ in net.calls)
+    assert res["bluesky"] == "skipped: not configured" and not any("bsky" in u for u, _, _ in net.calls)
+    assert poller.store.status()["bluesky"]["state"] == "skipped"
 
 
 # ---------------------------------------------------------------- store + poller
@@ -198,14 +199,15 @@ def test_poller_sources_fail_independently_with_backoff(tmp_path):
     st = L.LiveStore(tmp_path / "l.sqlite")
     poller = L.Poller(st, fetcher(FakeNet(routes)), interval=600, bluesky=False)
     res = poller.poll_once(NOW, force=True)
-    assert res["sachet"].startswith("ok") and res["news"].startswith("error")
+    assert res["sachet"].startswith("ok") and res["news"].startswith("failed")
     status = st.status()
-    assert status["sachet"]["state"] == "ok" and status["news"]["failures"] == 1
+    assert status["sachet"]["state"] == "ok" and status["news"]["state"] == "failed" and status["news"]["failures"] == 1
+    assert status["sachet"]["duration"] is not None
     assert datetime.fromisoformat(status["news"]["next_allowed"]) == NOW + timedelta(seconds=600)
     assert len(st.items(kinds=("official_alert",))) == 1
     later = NOW + timedelta(seconds=700)
     res2 = poller.poll_once(later)
-    assert res2["news"].startswith("error") and st.status()["news"]["failures"] == 2
+    assert res2["news"].startswith("failed") and st.status()["news"]["failures"] == 2
     assert datetime.fromisoformat(st.status()["news"]["next_allowed"]) == later + timedelta(seconds=1200)  # doubled
     assert poller.poll_once(later + timedelta(seconds=60))["sachet"] == "not due"
     assert st.last_updated() == later  # SACHET was due again at +700 s and succeeded
@@ -232,3 +234,102 @@ def test_simulated_incident_inject_and_clear(tmp_path):
     sims = [i for i in st.items() if i.source == "simulated"]
     assert all(i.id.startswith("sim-") and i.url == "" and i.extra.get("simulated") for i in sims)
     assert S.clear(st) == len(S.SIM_POSTS) and [i.source for i in st.items()] == ["news"]  # real data untouched
+
+
+
+# ---------------------------------------------------------------- never blocking: budgets, slow, skipped
+def slow_net(delay: float, routes):
+    import time as _t
+
+    def transport(url, headers, body=None):
+        if "rss_india" in url:
+            _t.sleep(delay)
+        return FakeNet(routes)(url, headers, body)
+    return transport
+
+
+def test_slow_source_does_not_block_and_is_marked_slow(tmp_path):
+    import time as _t
+
+    st = L.LiveStore(tmp_path / "l.sqlite")
+    routes = sachet_routes(**{"https://api.gdeltproject.org/robots.txt": (404, b""),
+                              "https://api.gdeltproject.org/api": (200, fx("gdelt_artlist.json"))})
+    fetch = L.PoliteFetcher(transport=slow_net(1.5, routes), sleep=lambda s: None)
+    poller = L.Poller(st, fetch, interval=600, bluesky=False, budgets={"sachet": 0.3, "news": 5})
+    t0 = _t.monotonic()
+    res = poller.poll_once(NOW, force=True)
+    assert _t.monotonic() - t0 < 1.2  # did not wait for SACHET
+    assert res["sachet"] == "slow: still running" and res["news"].startswith("ok")
+    assert st.status()["sachet"]["state"] == "slow" and "still running" in st.status()["sachet"]["note"]
+    assert len(st.items(kinds=("news",))) == 2  # news stored while SACHET was still busy
+    again = poller.poll_once(NOW + timedelta(seconds=1), force=True)
+    assert again["sachet"] == "skipped: previous poll still running"
+    poller._threads["sachet"].join(5)  # the slow poll finishes in the background and records its outcome
+    s = st.status()["sachet"]
+    assert s["state"] == "slow" and "time budget reached" in s["note"]  # it stopped before the CAP documents
+    assert st.items(kinds=("official_alert",)) == []
+    poller.budgets["sachet"] = 10  # next poll, with room in the budget, fetches the CAP documents
+    poller.poll_once(NOW + timedelta(seconds=2), force=True)
+    assert len(st.items(kinds=("official_alert",))) == 1
+
+
+def test_sachet_deadline_returns_partial_results():
+    import time as _t
+
+    net = FakeNet(sachet_routes())
+    alerts, examined, errors = L.poll_sachet(fetcher(net), set(), feeds=("india",), deadline=_t.monotonic() - 1)
+    assert alerts == [] and examined == [] and "_budget" in errors  # stopped immediately, no exception
+    alerts, examined, errors = L.poll_sachet(fetcher(net), set(), feeds=("india",), deadline=_t.monotonic() + 30)
+    assert len(alerts) == 1 and "_budget" not in errors
+
+
+def test_partial_sachet_poll_is_slow_not_failed(tmp_path, monkeypatch):
+    st = L.LiveStore(tmp_path / "l.sqlite")
+    monkeypatch.setattr(L, "poll_sachet", lambda *a, **k: ([], [], {"_budget": "time budget reached after 3 of 25"}))
+    poller = L.Poller(st, fetcher(FakeNet({})), interval=600, bluesky=False, budgets={"news": 0.01})
+    poller.poll_once(NOW, force=True)
+    s = st.status()["sachet"]
+    assert s["state"] == "slow" and "time budget reached" in s["note"] and s["last_success"] == NOW.isoformat()
+
+
+def test_robots_block_is_skipped_not_failed(tmp_path, monkeypatch):
+    st = L.LiveStore(tmp_path / "l.sqlite")
+
+    def blocked(*a, **k):
+        raise L.FetchError("blocked by robots.txt: https://example/rss")
+    monkeypatch.setattr(L, "poll_news", blocked)
+    monkeypatch.setattr(L, "poll_sachet", lambda *a, **k: ([], [], {}))
+    L.Poller(st, fetcher(FakeNet({})), interval=600, bluesky=False).poll_once(NOW, force=True)
+    assert st.status()["news"]["state"] == "skipped" and "robots" in st.status()["news"]["last_error"]
+
+
+def test_old_database_gets_new_status_columns(tmp_path):
+    import sqlite3
+
+    db = tmp_path / "old.sqlite"
+    with sqlite3.connect(db) as c:
+        c.execute("CREATE TABLE source_status (source TEXT PRIMARY KEY, state TEXT, last_attempt TEXT, last_success "
+                  "TEXT, last_error TEXT, failures INTEGER DEFAULT 0, next_allowed TEXT, last_new INTEGER DEFAULT 0)")
+    st = L.LiveStore(db)
+    st.set_status("news", state="ok", duration=1.5, note="x")
+    assert st.status()["news"]["duration"] == 1.5
+
+
+def test_gdelt_retries_rate_limits_politely():
+    calls = {"n": 0}
+
+    def flaky(url, headers, body=None):
+        if url.endswith("robots.txt"):
+            return 404, b""
+        calls["n"] += 1
+        return (429, b"Please limit requests to one every 5 seconds") if calls["n"] < 3 else (200, fx("gdelt_artlist.json"))
+
+    waits = []
+    f = L.PoliteFetcher(transport=flaky, sleep=waits.append)
+    items = L.poll_news(f, queries=("flood",))
+    assert len(items) == 2 and calls["n"] == 3
+    assert 15.0 in waits and 30.0 in waits  # backed off 15 s, then 30 s
+    always = L.PoliteFetcher(transport=lambda u, h, b=None: (404, b"") if u.endswith("robots.txt") else (429, b""),
+                             sleep=lambda s: None)
+    with pytest.raises(L.FetchError, match="429"):
+        L.poll_news(always, queries=("flood",))

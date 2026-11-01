@@ -127,13 +127,17 @@ def build_map(posts: list[Post], warnings: list | None = None) -> folium.Map:
                  f'<div class="aa-pop-meta">{p.label_score:.0%} confidence · {html.escape(p.language or "und")} · '
                  f'{html.escape(p.id)}</div>{html.escape(p.text)}'
                  f'<div>{source_badge(p.source) if p.source in ("sachet", "news", "bluesky", "simulated") else ""}'
-                 f'{label_badge(p.label.value)}{rule_badge(p.rule)}'
+                 f'{label_badge(p.label.value)}{rule_badge(p.rule, confirms=p.model_label == p.label)}'
                  f'{cred_badge(p.misinfo_score, FLAG_THRESHOLD)}</div>')
         if p.url:
             popup += (f'<div><a class="aa-pop-link" href="{html.escape(p.url, quote=True)}" target="_blank" '
                       f'rel="noopener noreferrer">open original ↗</a></div>')
         if p.rule:
-            popup += f'<div class="aa-pop-meta">the classifier said {html.escape(p.model_label.value)}; a distress rule overrode it</div>'
+            if p.model_label and p.model_label != p.label:
+                popup += (f'<div class="aa-pop-meta">the classifier said {html.escape(p.model_label.value)}; '
+                          f'a distress rule overrode it</div>')
+            else:
+                popup += '<div class="aa-pop-meta">a distress rule agrees with the classifier</div>'
         flagged = (p.misinfo_score or 0) >= FLAG_THRESHOLD
         if p.misinfo_reasons:
             popup += (f'<span class="aa-pop-flag">why the misinformation score is {p.misinfo_score:.2f}:</span><ul>'

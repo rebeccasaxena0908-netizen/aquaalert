@@ -100,9 +100,16 @@ never pads the view with sample data. CLI: `python -m aquaalert.ingest.live --on
 | Source | What | Access | Status (checked 2026-11-01) |
 |---|---|---|---|
 | **NDMA SACHET** | CAP 1.2 alerts from IMD, CWC and state SDMAs. Feeds: `https://sachet.ndma.gov.in/cap_public_website/rss/rss_<feed>.xml` for `india`, `kerala`, `assam`, `bihar`, `odisha`, `uttarakhand`, `karnataka`, `maharashtra`, `gujarat`; each item links to its CAP XML. Flood, heavy-rain and river alerts are kept (event, severity, urgency, area, sender, effective/expires, headline, instruction, link). | Public, no key; no robots.txt (404 = allowed) | **Verified live**: all 9 feeds fetched; 2 heavy-rain alerts kept (Andhra Pradesh SDMA, cyclone rain). Multi-word states (Tamil Nadu, West Bengal, …) returned 404 for every spelling tried, so they come only via the all-India feed. Slow at times (a full poll took ~3 min). |
-| **News (GDELT DOC 2.0)** | English and Hindi flood headlines from Indian sources, with real titles, links and times | Public, no key; ≤ 1 request / 5 s (enforced: 6 s gap) | **Not verified live**: rate-limited (HTTP 429) and later TLS timeouts during development; tested on a constructed response. |
+| **News (GDELT DOC 2.0)** | English and Hindi flood headlines from Indian sources, with real titles, links and times | Public, no key; ≤ 1 request / 5 s (enforced: 6 s gap; a 429 is retried after 15 s, then 30 s) | **Not verified live**: on 2026-11-01 every API request returned HTTP 429 ("Please limit requests to one every 5 seconds") even 12–42 s apart, after earlier TLS timeouts; robots.txt is absent (404). Tested on a constructed response. |
 | **Bluesky** | `app.bsky.feed.searchPosts` for flood terms in English, Hindi, Malayalam (`sort=latest`, last 24 h) | Needs a login: unauthenticated search returns 403. Session via `com.atproto.server.createSession` on `bsky.social`, kept in memory only | **Not verified live** (no credentials here); tested on a constructed response. Skipped quietly when the credentials are missing. |
 | ~~Google News RSS~~ | – | **Not used**: `news.google.com/robots.txt` disallows `/` (incl. `/rss`) for generic agents | – |
+
+**Never blocking:** each source polls in its own background thread with a time budget (SACHET 120 s, news 120 s,
+Bluesky 45 s) and 25 s per-request timeouts. SACHET stops fetching CAP documents near its budget and keeps what it
+has. The dashboard only reads SQLite, so a slow source never freezes it. Each source shows one of **ok**, **slow**
+(used more than half its budget, returned partial results, or is still running; stored results stay visible),
+**failed** (error, exponential backoff) or **skipped** (not configured, blocked by robots.txt, or the previous poll is
+still running), with its last success time, duration and the reason.
 
 Politeness: every request checks robots.txt first (unreachable robots.txt = skip this poll; Python's robotparser
 applies the first matching rule, which is stricter than RFC 9309), keeps a minimum gap per host, and sends a
@@ -168,17 +175,39 @@ link if the dataset has a `url` column (the synthetic sample has none).
 Matching inherits classifier mistakes (e.g. a "need rescue" post labelled as an offer will be treated as an offer).
 
 ## Distress rules
-`classify/rules.py` runs after the classifier and promotes `offer_help` / `info_update` to `rescue_needed` when a post
-has an explicit request ("need rescue", "boats needed", "bachao") or a situation cue (trapped, stuck, rooftop, water
-entering, "chhat par") together with first-person wording. Offers, fundraising/volunteer appeals, thanks and past-tense
-accounts are left alone. When a rule fires the Post records `rule` and the model's own `model_label`; the dashboard
-shows both. Turn it off with `AQUAALERT_RULES=off`.
+`classify/rules.py` runs after the classifier and catches clear first-person distress the model missed, in English,
+romanised Hindi / Malayalam / Bengali (Hinglish, Manglish, Banglish) and the native scripts:
 
-Effect: on the 50 sample posts 3 labels change (s020, s021, s045; all to the correct `rescue_needed`; accuracy vs the
-sample's labels 0.70 → 0.76 with MuRIL). On the HumAID test split it fires on 20 of 15,160 tweets (MuRIL):
-macro-F1 (all 7) 0.727 → 0.716, macro-F1 (5 large classes) 0.759 → 0.759. The drop is all in `rescue_needed`
-(22 gold tweets, defined by a regex over one HumAID class), so HumAID can't really measure this rule; the numbers in
-**Results** above are without it.
+- **explicit** requests fire on their own: "need rescue", "boats needed", "please send boats", "bachao",
+  "boat bhejo", "humein nikalo", "rakshikkane", "thoni venam", "uddhar korun", "nouka pathan", "बचाओ", "രക്ഷിക്ക", "উদ্ধার করুন";
+- **ambiguous** phrases ("help us", "SOS", "please send help", "jaldi madad", "pettennu sahayikkuka") and
+- **situation** cues with a first-person marker ("we are trapped", "hum chhat pe fase hue hain", "paani ghar mein",
+  "njangal kudungi", "vellam kayari", "amra chhade atke achhi", "ഞങ്ങൾ … കുടുങ്ങി", "আমরা … আটকে")
+
+are blocked by appeal and thanks wording (donate, chanda, dhanyavad, nanni, dhonnobad…), past tense ("hum phanse the",
+"rakshappettu", "atke chhilam", "bacha liya") and rescuer wording ("hamare paas naav hai", "thoni undu", "amader
+nouka ache"). Hashtags, @mentions, URLs and slogans ("desh bachao", `#BJP_भगाओ_देश_बचाओ`) are ignored.
+
+What a cue may change: `offer_help` / `info_update` → `rescue_needed`; `need_supplies` → `rescue_needed` only for an
+explicit cue or a first-person situation with no supplies asked for (an appeal like "please send help to Puerto Rico"
+stays a request); `irrelevant` → `rescue_needed` only for explicit cues; `missing_person` and `infrastructure_damage` are
+never touched. When the model already said `rescue_needed`, the rule is recorded as **confirming** it. The Post keeps
+`rule` and the model's `model_label`; the dashboard shows a rule badge ("overrode …" or "· confirms") in map popups and
+the table. Turn it off with `AQUAALERT_RULES=off`.
+
+Effect (rules tuned on the sample and HumAID **dev**; HumAID **test** evaluated once):
+
+| | No rules | Previous rules | Current rules |
+|---|---:|---:|---:|
+| HumAID test macro-F1, MuRIL (English-only) | 0.727 | 0.716 | 0.722 |
+| HumAID test macro-F1, MuRIL + romanised | 0.736 | 0.726 | 0.731 |
+| … large 5 classes (both models) | 0.759 / 0.763 | unchanged | unchanged |
+
+On the 94 English + multilingual sample posts the current rules change 7 labels with the English-only model and 4 with
+the romanised one, every one from wrong to right (e.g. Banglish 0.17 → 0.50 and Manglish 0.43 → 0.71 with the English
+model; Hinglish 0.67 → 0.78 with the romanised model), and confirm 14 rescue posts the romanised model already had.
+On HumAID the rules still cost ~0.005 macro-F1 against no rules, all in `rescue_needed` (22 gold tweets, defined by a
+regex), so the **Results** table reports the models without rules.
 
 ## Chatbot
 The **Chatbot** tab answers flood-preparedness questions from the PDFs in `data/docs/` plus the latest district briefs,

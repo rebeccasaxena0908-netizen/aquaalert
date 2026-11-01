@@ -31,6 +31,8 @@ def classify_posts(posts: list[Post], clf: Classifier, rules: bool = True) -> li
         if rules:
             final, rule, conf = apply_rules(post.text, best)
             if rule:
-                update.update(label=final, label_score=conf, model_label=best, rule=rule)
+                # conf is None when the rule only confirms the model: keep the model's own score
+                update.update(label=final, model_label=best, rule=rule,
+                              **({"label_score": conf} if conf is not None else {}))
         out.append(post.model_copy(update=update))
     return out

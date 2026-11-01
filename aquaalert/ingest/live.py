@@ -52,6 +52,11 @@ BSKY_PDS = "https://bsky.social"
 CAP_NS = {"cap": "urn:oasis:names:tc:emergency:cap:1.2"}
 SOURCES = ("sachet", "news", "bluesky")
 MAX_CAP_PER_POLL = 25  # CAP documents fetched per poll (the all-India feed lists 100 items)
+REQUEST_TIMEOUT = float(os.getenv("AQUAALERT_LIVE_REQUEST_TIMEOUT", "25"))  # seconds per HTTP request
+# Per-source time budget for one poll (seconds). A source still running past its budget is shown as "slow"; it keeps
+# running in its worker thread and is not started again until it finishes.
+BUDGETS = {"sachet": 120.0, "news": 120.0, "bluesky": 45.0}  # news: room for two 429 retries (15 s + 30 s)
+SLOW_AFTER = 0.5  # a successful poll that used more than this share of its budget is "slow"
 
 # Flood keywords: English, Hindi, Malayalam, Bengali/Assamese, Marathi, plus romanised forms
 FLOOD_TERMS = re.compile(
@@ -72,7 +77,7 @@ Transport = Callable[[str, dict, bytes | None], tuple[int, bytes]]
 def urllib_transport(url: str, headers: dict, body: bytes | None = None) -> tuple[int, bytes]:
     req = urllib.request.Request(url, data=body, headers=headers, method="POST" if body is not None else "GET")
     try:
-        with urllib.request.urlopen(req, timeout=40) as resp:
+        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
             return resp.status, resp.read()
     except urllib.error.HTTPError as exc:
         return exc.code, exc.read() if exc.fp else b""
@@ -196,24 +201,34 @@ def is_flood_alert(cap: dict) -> bool:
     return bool(SACHET_KEEP.search(" ".join((cap.get("event", ""), cap.get("headline", ""), cap.get("description", "")))))
 
 
-def poll_sachet(fetch: PoliteFetcher, known: set[str], feeds=SACHET_FEEDS, max_cap: int = MAX_CAP_PER_POLL):
+def poll_sachet(fetch: PoliteFetcher, known: set[str], feeds=SACHET_FEEDS, max_cap: int = MAX_CAP_PER_POLL,
+                deadline: float | None = None):
     """Return (flood-related alerts, ids of every CAP item examined, per-feed errors). Only new items are fetched.
 
-    A failing feed or CAP document is skipped; the source as a whole fails only when every feed fails.
+    A failing feed or CAP document is skipped; the source as a whole fails only when every feed fails. With a
+    ``deadline`` (time.monotonic()) the poll stops early and returns what it has; ``errors["_budget"]`` says so.
     """
+    over = lambda: deadline is not None and time.monotonic() >= deadline  # noqa: E731
     seen: dict[str, dict] = {}
     errors: dict[str, str] = {}
     for feed in feeds:
+        if over():
+            errors["_budget"] = f"time budget reached before feed '{feed}'"
+            break
         try:
             for item in parse_sachet_rss(fetch.get(f"{SACHET_BASE}rss_{feed}.xml")):
                 seen.setdefault(item["guid"], {**item, "feed": feed})
         except (FetchError, ET.ParseError) as exc:
             errors[feed] = str(exc)[:120]
-    if len(errors) == len(feeds):
+    if feeds and not seen and len([k for k in errors if k != "_budget"]) == len(feeds):
         raise FetchError("all SACHET feeds failed: " + "; ".join(f"{k}: {v}" for k, v in errors.items())[:280])
     new = sorted((i for g, i in seen.items() if f"sachet:{g}" not in known), key=lambda i: i["published"], reverse=True)
     alerts, examined = [], []
-    for item in new[:max_cap]:
+    todo = new[:max_cap]
+    for n, item in enumerate(todo):
+        if over():
+            errors["_budget"] = f"time budget reached after {n} of {len(todo)} new CAP documents"
+            break
         examined.append(f"sachet:{item['guid']}")
         try:
             cap = parse_cap(fetch.get(item["link"]))
@@ -251,12 +266,25 @@ def parse_gdelt(json_bytes: bytes) -> list[LiveItem]:
     return out
 
 
-def poll_news(fetch: PoliteFetcher, queries=GDELT_QUERIES) -> list[LiveItem]:
+GDELT_RETRY_WAITS = (15.0, 30.0)  # seconds to wait after a 429 before retrying a query (polite backoff)
+
+
+def poll_news(fetch: PoliteFetcher, queries=GDELT_QUERIES, retry_waits=GDELT_RETRY_WAITS) -> list[LiveItem]:
+    """GDELT queries one at a time (>= 6 s apart); a rate-limited query is retried after 15 s, then 30 s."""
     items = []
     for q in queries:
         params = {"query": q, "mode": "artlist", "format": "json", "maxrecords": "75", "sort": "datedesc",
                   "timespan": "24h"}
-        items += parse_gdelt(fetch.get(f"{GDELT_URL}?{urllib.parse.urlencode(params)}"))
+        url = f"{GDELT_URL}?{urllib.parse.urlencode(params)}"
+        for attempt in range(len(retry_waits) + 1):
+            try:
+                items += parse_gdelt(fetch.get(url))
+                break
+            except FetchError as exc:
+                rate_limited = "429" in str(exc) or "limit requests" in str(exc).lower()
+                if not rate_limited or attempt == len(retry_waits):
+                    raise
+                fetch.sleep(retry_waits[attempt])
     return [i for i in items if is_flood_related(i.text)]
 
 
@@ -319,7 +347,7 @@ CREATE INDEX IF NOT EXISTS items_hash ON items(content_hash);
 CREATE TABLE IF NOT EXISTS seen (id TEXT PRIMARY KEY, seen_at TEXT);
 CREATE TABLE IF NOT EXISTS source_status (
   source TEXT PRIMARY KEY, state TEXT, last_attempt TEXT, last_success TEXT, last_error TEXT,
-  failures INTEGER DEFAULT 0, next_allowed TEXT, last_new INTEGER DEFAULT 0);
+  failures INTEGER DEFAULT 0, next_allowed TEXT, last_new INTEGER DEFAULT 0, duration REAL, note TEXT);
 """
 
 
@@ -329,6 +357,10 @@ class LiveStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._conn() as c:
             c.executescript(SCHEMA)
+            cols = {r[1] for r in c.execute("PRAGMA table_info(source_status)")}
+            for col, typ in (("duration", "REAL"), ("note", "TEXT")):  # databases created before these columns
+                if col not in cols:
+                    c.execute(f"ALTER TABLE source_status ADD COLUMN {col} {typ}")
 
     def _conn(self) -> sqlite3.Connection:
         c = sqlite3.connect(self.path, timeout=30)
@@ -404,56 +436,98 @@ def backoff(failures: int, base: int) -> timedelta:
 
 
 class Poller:
-    """Polls each source when due; a failing source backs off without affecting the others."""
+    """Polls each source in its own worker thread with a time budget; never blocks the caller for long.
+
+    Source states: ``ok`` | ``slow`` (finished but used > SLOW_AFTER of its budget, returned partial results, or is
+    still running past its budget) | ``failed`` (error; exponential backoff) | ``skipped`` (not configured, blocked by
+    robots.txt, or the previous poll is still running). Items already stored stay visible whatever the state.
+    """
 
     def __init__(self, store: LiveStore, fetch: PoliteFetcher | None = None, interval: int | None = None,
-                 bluesky: BlueskyClient | None | bool = True) -> None:
+                 bluesky: BlueskyClient | None | bool = True, budgets: dict[str, float] | None = None) -> None:
         self.store, self.fetch = store, fetch or PoliteFetcher()
         self.interval = interval or interval_seconds()
+        self.budgets = {**BUDGETS, **(budgets or {})}
         if bluesky is True:
             handle, pw = os.getenv("BLUESKY_HANDLE", "").strip(), os.getenv("BLUESKY_APP_PASSWORD", "").strip()
             bluesky = BlueskyClient(self.fetch, handle, pw, os.getenv("BLUESKY_PDS") or BSKY_PDS) if handle and pw else None
         self.bluesky = bluesky or None
+        self._threads: dict[str, threading.Thread] = {}
 
     def _due(self, source: str, now: datetime) -> bool:
         st = self.store.status().get(source, {})
         nxt = st.get("next_allowed")
         return not nxt or datetime.fromisoformat(nxt) <= now
 
+    def _run_source(self, source: str, now: datetime, results: dict) -> None:
+        """Worker: fetch one source and record its outcome (runs in its own thread)."""
+        budget = self.budgets[source]
+        start = time.monotonic()
+        prev = self.store.status().get(source, {})
+        try:
+            note = None
+            partial = False
+            if source == "sachet":
+                items, examined, feed_errors = poll_sachet(self.fetch, self.store.seen_ids(), deadline=start + budget * 0.9)
+                self.store.mark_seen(examined, now)
+                partial = "_budget" in feed_errors
+                notes = [feed_errors.pop("_budget")] if partial else []
+                if feed_errors:
+                    notes.append(f"{len(feed_errors)} feed(s) failed: " + ", ".join(feed_errors))
+                note = "; ".join(notes) or None
+            elif source == "news":
+                items = poll_news(self.fetch)
+            else:
+                items = poll_bluesky(self.bluesky, now)
+            new = self.store.add(items, now)
+            took = time.monotonic() - start
+            state = "slow" if partial or took > budget * SLOW_AFTER else "ok"
+            # timestamps use the poll's clock (``now``); durations use the monotonic timer
+            self.store.set_status(source, state=state, last_success=now.isoformat(), last_error=None, note=note,
+                                  failures=0, last_new=new, duration=round(took, 1),
+                                  next_allowed=(now + timedelta(seconds=self.interval)).isoformat())
+            results[source] = f"{state}: {new} new in {took:.1f}s"
+        except Exception as exc:  # each source fails on its own
+            took = time.monotonic() - start
+            failures = (prev.get("failures") or 0) + 1
+            blocked = "blocked by robots.txt" in str(exc)
+            state = "skipped" if blocked else "failed"
+            self.store.set_status(source, state=state, last_error=str(exc)[:300], note=None, failures=failures,
+                                  duration=round(took, 1),
+                                  next_allowed=(now + backoff(failures, self.interval)).isoformat())
+            results[source] = f"{state}: {exc}"
+
     def poll_once(self, now: datetime | None = None, force: bool = False) -> dict[str, str]:
+        """Start every due source in parallel and wait at most each source's budget; returns a summary per source."""
         now = now or datetime.now(UTC)
         results: dict[str, str] = {}
+        started: dict[str, threading.Thread] = {}
         for source in SOURCES:
             if source == "bluesky" and self.bluesky is None:
-                self.store.set_status("bluesky", state="not configured", last_error=None)
-                results[source] = "not configured"
+                self.store.set_status("bluesky", state="skipped", note="not configured (no BLUESKY_HANDLE / "
+                                      "BLUESKY_APP_PASSWORD)", last_error=None)
+                results[source] = "skipped: not configured"
+                continue
+            running = self._threads.get(source)
+            if running is not None and running.is_alive():
+                self.store.set_status(source, note="previous poll still running; showing stored results")
+                results[source] = "skipped: previous poll still running"
                 continue
             if not force and not self._due(source, now):
                 results[source] = "not due"
                 continue
-            prev = self.store.status().get(source, {})
             self.store.set_status(source, last_attempt=now.isoformat())
-            try:
-                note = None
-                if source == "sachet":
-                    items, examined, feed_errors = poll_sachet(self.fetch, self.store.seen_ids())
-                    self.store.mark_seen(examined, now)
-                    if feed_errors:
-                        note = f"{len(feed_errors)} feed(s) failed: " + ", ".join(feed_errors)
-                elif source == "news":
-                    items = poll_news(self.fetch)
-                else:
-                    items = poll_bluesky(self.bluesky, now)
-                new = self.store.add(items, now)
-                self.store.set_status(source, state="ok", last_success=now.isoformat(), last_error=note, failures=0,
-                                      last_new=new, next_allowed=(now + timedelta(seconds=self.interval)).isoformat())
-                results[source] = f"ok: {new} new"
-            except Exception as exc:  # each source fails on its own
-                failures = (prev.get("failures") or 0) + 1
-                state = "blocked" if "robots.txt" in str(exc) and "blocked" in str(exc) else "error"
-                self.store.set_status(source, state=state, last_error=str(exc)[:300], failures=failures,
-                                      next_allowed=(now + backoff(failures, self.interval)).isoformat())
-                results[source] = f"{state}: {exc}"
+            t = threading.Thread(target=self._run_source, args=(source, now, results), daemon=True,
+                                 name=f"aquaalert-{source}")
+            self._threads[source] = started[source] = t
+            t.start()
+        deadline = time.monotonic() + max((self.budgets[s] for s in started), default=0)
+        for source, t in started.items():
+            t.join(timeout=max(0.0, min(self.budgets[source], deadline - time.monotonic())))
+            if t.is_alive():
+                self.store.set_status(source, state="slow", note=f"still running after {self.budgets[source]:.0f}s "
+                                      "budget; showing stored results")
+                results[source] = "slow: still running"
         return results
 
     def run_forever(self, stop: threading.Event | None = None) -> None:

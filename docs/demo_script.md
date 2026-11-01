@@ -15,18 +15,18 @@ Timings are a guide; the bold lines are what to say, the rest is what to do.
 | 4 | Terminal 1: `streamlit run dashboard/app.py` → <http://localhost:8501> | |
 | 5 | Terminal 2: `uvicorn api.main:app --reload` → <http://127.0.0.1:8000/docs> | |
 | 6 | Load the dashboard once before presenting (first load classifies and geocodes 110 posts) and wait for the map tiles. | Avoids a spinner on stage. |
-| 7 | Sidebar → **Replay time** → **Aug 15, 22:40**. Optional: **Pause background** on if you are screen-recording. | At this time the KPI row reads **105 posts · 17 rescue requests · 4 warnings · 4 low-credibility**. |
+| 7 | Sidebar → **Replay time** → **Aug 15, 22:40**. Optional: **Pause background** on if you are screen-recording. | At this time the KPI row reads **105 posts · 24 rescue requests (5 promoted, 14 confirmed by the distress rules) · 4 warnings · 4 low-credibility**. |
 
 ### Pre-demo checklist for Live mode (optional segment)
 
 1. **30 minutes before:** start the dashboard and pick **Dataset → LIVE · NDMA SACHET, news, Bluesky** (or start it
    with `AQUAALERT_MODE=live streamlit run dashboard/app.py`). The background poller needs a few polls to fill the
    store; the first SACHET poll can take several minutes.
-2. **Check the SACHET card** under the header: `ok` with a recent "last success" time is good. `error` or a backoff
-   note means the feed is slow or down: open
+2. **Check the SACHET card** under the header: `ok` with a recent "last success" time is good; `slow` means it is
+   working but near its 120 s budget (stored alerts stay visible). `failed` means the feed is down: open
    <https://sachet.ndma.gov.in/cap_public_website/rss/rss_india.xml> in a browser to confirm, and plan to use Replay.
-   The News (GDELT) card may show `error` when GDELT is rate-limiting; Bluesky shows `not configured` without an app
-   password. Both are fine for the demo.
+   The News (GDELT) card may show `failed` when GDELT is rate-limiting (it did on 2026-11-01); Bluesky shows `skipped`
+   without an app password. Both are fine for the demo, and no source can freeze the page: polling runs in the background.
 3. **Check the Gemini key**: ask the chatbot one question. An HTTP 429 / timeout notice means briefs and chat will use
    the offline fallback.
 4. **Expect sparse data.** Outside a flood, Live mode may honestly show "No flood-related items in the last 24h" or
@@ -45,7 +45,7 @@ Hindi, Bengali and in mixed, romanised forms like 'njangal veettil kudungi'. Res
 work out who needed rescue, where they were, which posts were rumours, and which offers of help matched which needs.
 AquaAlert does that triage automatically and shows it on one screen."**
 
-Point at the header: the replay chip (**Replay · 15 Aug 2018 22:40**), **7 languages**, **MuRIL**, **LLM: Gemini**.
+Point at the header: the replay chip (**Replay · 15 Aug 2018 22:40**), **7 languages**, **muril_romanised**, **LLM: Gemini**.
 
 ## 0:40 – 1:30 · Architecture (one sentence per stage)
 
@@ -72,19 +72,20 @@ request. The shaded circles are district risk levels."**
 
 1. **Rule-fired rescue post — s045, Perumbavoor.** Click the red dot north-east of Kochi (Perumbavoor).
    Popup: *"Need rescue! 3 kids and 2 adults on the rooftop in Perumbavoor. Water is above 8 feet."* with the badges
-   **rescue needed · rule: distress strong · no red flags** and the line *"the classifier said offer_help; a distress
-   rule overrode it"*.
-   **"MuRIL was trained on HumAID, where 'rescue' and 'boats' usually come from volunteers, so it read this as an
-   offer. The rule layer sees an explicit 'need rescue' and promotes it, and records that it did."**
-   (Other rule-fired posts if you want a second example: s021 Edathua "Rescue boats needed…", s020 Paravur "SOS!
-   Pregnant woman needs evacuation".)
+   **rescue needed · rule: distress strong · no red flags** and the line *"the classifier said need_supplies; a
+   distress rule overrode it"*.
+   **"The model read this as a supply request. The rule layer sees an explicit 'need rescue', promotes it, and records
+   that it did. When the model already gets it right, the badge says 'confirms' instead."**
+   (Second example: s021 Edathua "Rescue boats needed…", also overridden from need_supplies; s020 Paravur "SOS!
+   Pregnant woman needs evacuation" shows the *confirms* badge.)
 2. **Multilingual.** Click around Chengannur (south of Alappuzha):
-   - **m014** (Malayalam script): *"ചെങ്ങന്നൂരിൽ ഞങ്ങളുടെ വീടിന്റെ മുകളിൽ 12 പേർ കുടുങ്ങി…"* → rescue needed, 85 %,
+   - **m014** (Malayalam script): *"ചെങ്ങന്നൂരിൽ ഞങ്ങളുടെ വീടിന്റെ മുകളിൽ 12 പേർ കുടുങ്ങി…"* → rescue needed, 99 %,
      placed in Chengannur from the Malayalam place name.
    - **m001** (Hindi): *"चेंगन्नूर में हमारे घर की छत पर 8 लोग फंसे हैं…"* → rescue needed.
-   - **m009** (Hinglish): *"Hum Aluva me ghar ki chhat par phanse hain…"* → rescue needed via the contextual rule.
-   **"Native-script posts transfer well from English training: Hindi 0.89, Bengali 0.86, Malayalam 0.73 accuracy on
-   our hand-written set."**
+   - **m009** (Hinglish): *"Hum Aluva me ghar ki chhat par phanse hain… jaldi boat bhejo"* → rescue needed; the model
+     said need_supplies and the Hinglish distress rule ("boat bhejo") overrode it.
+   **"With the romanised training data, accuracy on our hand-written posts is Hindi 1.00, Bengali 1.00, Malayalam 0.73
+   (0.82 with the rules), Hinglish 0.67 (0.78), Manglish 0.86, Banglish 0.50."**
 3. Optional: the **Languages** filter in the sidebar to show only `ml`, then reset it.
 
 ## 2:30 – 3:15 · Credibility flags
@@ -110,7 +111,7 @@ Move **Replay time** back to **Aug 15, 22:40**.
 ## 3:15 – 3:50 · Daily brief
 
 **Daily brief** tab → **Day: 2018-08-15** → **Generate briefs** (Gemini; cached after the first run).
-Open **Alappuzha**: **"7 rescue requests, about 57 people, 2 missing-person reports"**, the most urgent posts first,
+Open **Alappuzha**: **"11 rescue requests, about 63 people, 2 missing-person reports"**, the most urgent posts first,
 every claim cited with a post ID (s038 Kuttanad church, s001 Chengannur rooftop…), phone numbers redacted as
 `<phone>` before the text goes to the LLM, and **"1 doubtful post left out"**.
 The sources list under the summary links each cited post.
@@ -129,7 +130,7 @@ The sources list under the summary links each cited post.
 ## 4:25 – 5:00 · Warnings
 
 **Warnings** tab (15 Aug): **4 WARNING, 8 WATCH**.
-Open **Alappuzha**: *"9 rescue/damage posts vs 0.0/day over the previous 3 days | rainfall 196 mm (very heavy;
+Open **Alappuzha**: *"13 rescue/damage posts vs 0.0/day over the previous 3 days | rainfall 196 mm (very heavy;
 threshold 115.6 mm)"*. **"A warning needs both: people posting for help *and* a sensor threshold."** Idukki also shows
 *"Periyar at 91 % of its danger level"*. Pick **Idukki** in **Sensor history** to show the rainfall peak and the river
 rising a day later. On the **Map**, the district risk layer shows the same levels.
@@ -150,7 +151,7 @@ policy documents, and the bot tells you to call 112 if you are in danger."**
 Open <http://127.0.0.1:8000/docs>.
 - `GET /warnings` → **Try it out** → `day=2018-08-15`, `level=warning` → the same four districts with reasons.
 - `POST /classify` with `{"text": "Hum Aluva me ghar ki chhat par phanse hain, 6 log hain, jaldi boat bhejo"}` →
-  `label: rescue_needed`, `rule: distress_contextual`, `model_label: offer_help`, `language: hi-Latn`,
+  `label: rescue_needed`, `rule: distress_strong`, `model_label: need_supplies`, `language: hi-Latn`,
   district **Ernakulam**, `people_count: 6`, misinformation score 0.
 **"Everything on the dashboard is available to other tools: posts with filters, matches, briefs, warnings, chat."**
 
@@ -162,22 +163,25 @@ Open <http://127.0.0.1:8000/docs>.
 |---|---:|---:|---:|
 | Keyword fallback | 0.315 (0.302–0.327) | 0.342 | 0.354 |
 | embed_lr (MiniLM + logistic regression, Mac) | 0.605 (0.582–0.625) | 0.687 | 0.734 |
-| **MuRIL fine-tuned (Colab T4)** | **0.727 (0.700–0.752)** | **0.759** | **0.800** |
+| MuRIL fine-tuned (Colab T4) | 0.727 (0.700–0.752) | 0.759 | 0.800 |
+| **MuRIL + LLM-generated romanised data (Kaggle T4)** | **0.736 (0.706–0.764)** | **0.763** | **0.807** |
 
 Per language (accuracy on 44 hand-written multilingual posts + the English sample; tiny, synthetic sets):
 
 | | Hindi | Bengali | Malayalam | Hinglish | Manglish | Banglish |
 |---|---:|---:|---:|---:|---:|---:|
-| MuRIL | 0.89 | 0.86 | 0.73 | 0.44 (0.56 with rules) | 0.43 | 0.17 |
+| MuRIL (English-only) | 0.89 | 0.86 | 0.73 | 0.44 (0.67 with rules) | 0.43 (0.71) | 0.17 (0.50) |
+| **MuRIL + romanised data** | **1.00** | **1.00** | **0.73 (0.82)** | **0.67 (0.78)** | **0.86** | **0.50** |
 
-**"Native script works; romanised, code-mixed text is the weak spot. A retrained model with 4,552 LLM-generated
-romanised posts is training on Kaggle now."**
+**"Retraining with 4,552 LLM-generated romanised posts lifted Manglish from 0.43 to 0.86 and Banglish from 0.17 to
+0.50 without hurting HumAID; romanised Bengali is still the weakest. These test sets are 6–11 posts each."**
 
 Limitations to say out loud:
-- **Romanised text is weak** (0.17–0.56 above). Examples visible on the map: **s028** *"…6 jon manush bondi, nouka
-  dorkar"* (Banglish rescue) shows as *need supplies*; **m038** (Banglish rooftop SOS) as *irrelevant*.
+- **Romanised text is still the weak spot**, especially Banglish (0.50), and the per-language sets are tiny and
+  synthetic. Remaining errors on the map: **m011** (Hinglish *offer* of a truck) and **m041** (Banglish offer) read as
+  *need supplies*; **m013** and **m040** (missing-person posts) as *info update* / *need supplies*.
 - **The rescue class is tiny in HumAID** (22 test tweets), so its F1 and the distress-rule numbers are noisy; on
-  HumAID the rule layer slightly lowers macro-F1 (0.727 → 0.716) while fixing the sample's missed SOS posts.
+  HumAID the rule layer slightly lowers macro-F1 (0.736 → 0.731) while fixing the sample's missed SOS posts.
 - **Credibility is heuristic**, tuned on 16 synthetic rumour posts; treat scores as "check this", never as proof.
 - **Synthetic demo data**: posts, rumours and sensor readings are made up (shaped like 2018); the romanised
   training data is LLM-generated (~10 % meaning drift in a spot check; Bengali short of target).
@@ -192,17 +196,18 @@ fallbacks, and the next step is better romanised-language data."**
 
 ## Dashboard issues noticed while preparing this script
 
-Found while checking each feature on the sample data (15–16 Aug replay, MuRIL, Gemini):
+Found while checking each feature on the sample data (15–16 Aug replay, romanised MuRIL + distress rules, Gemini):
 
-1. **Romanised / code-mixed posts misclassified on the map.** s028 (Banglish rescue) → *need supplies* (49 %);
-   m038 (Banglish rooftop SOS) → *irrelevant* (89 %); m024 (Manglish) and m043 (Malayalam + English) rescue posts →
-   *need supplies*. Expected given the per-language results; avoid clicking these unless you are making that point.
-2. **Matches inherit those errors.** m037 (Bengali *"…please rescue us"*) is classified as an *offer* and gets matched
-   to m031, another stranded group; m027 (Manglish offer of a vehicle) is treated as a *need*; s041 (volunteers to
-   clean houses) is matched to a food-and-water request (s005) mainly because both are in Pandalam. Show s021→s022 and
-   m010→s035 instead.
-3. **Avoid ad-lib Hinglish in `/classify`.** *"Hum chhat par phase hue hain, please help! Aluva"* comes back as
-   *need supplies* with no rule (rules only override *offer help* / *info update*); use the m009 sentence above.
+1. **Remaining misclassifications on the map** (romanised model + rules): m011 (Hinglish truck *offer*) and m041
+   (Banglish offer) → *need supplies*; m013 (Hinglish missing person) → *info update*; m040 (Banglish missing person)
+   → *need supplies*. Avoid clicking these unless you are making that point. (s028, m038, m024 and m043, listed here
+   before, are now correct.)
+2. **Matches inherit those errors.** m011's truck *offer* is treated as a need and matched to m018 (another offer);
+   m019 (an offer of a place to stay) is matched to m003 (an offer of boats); and s038 (15 people stuck in a Kuttanad
+   church) is matched to **r012**, the "Army has stopped all rescue operations … forward to all" rumour (misinformation
+   0.35, below the 0.5 hide threshold). Show s021→s022 and m010→s035 instead.
+3. **`/classify` with romanised text** now works for both sentences tried (m009's sentence and *"Hum chhat par phase hue
+   hain, please help! Aluva"*), but other ad-lib phrasings may still miss; stick to the script's sentence.
 4. **Default replay time is 16 Aug 08:00**, when no district is at WARNING (0 warnings, 13 watch); move the slider to
    15 Aug 22:40 for the warnings segment.
 5. **The Daily brief tab defaults to the latest day (16 Aug)**, which has few posts; pick 2018-08-15. With Gemini
