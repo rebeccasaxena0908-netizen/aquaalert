@@ -93,3 +93,11 @@ def test_pipeline_respects_rules_flag(monkeypatch, tmp_path, make_post):
     assert process_posts([post], AlwaysOffer(), g)[0].label == Label.RESCUE_NEEDED
     monkeypatch.setenv("AQUAALERT_RULES", "off")
     assert process_posts([post], AlwaysOffer(), g)[0].label == Label.OFFER_HELP
+
+
+def test_train_cli_has_extra_train_flag():
+    import subprocess
+    import sys
+
+    out = subprocess.run([sys.executable, "-m", "aquaalert.classify.train", "--help"], capture_output=True, text=True)
+    assert out.returncode == 0 and "--extra-train" in out.stdout

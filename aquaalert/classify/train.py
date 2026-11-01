@@ -4,7 +4,8 @@
         --val data/raw/humaid/dev.csv --test data/raw/humaid/test.csv \
         --label-dataset humaid --out models/muril
 
-Loss weights are inverse class frequency on the training set. The checkpoint with the best dev
+``--extra-train`` adds training-only files (dev and test stay HumAID), e.g. the LLM-generated romanised posts from
+scripts/make_romanised_data.py. Loss weights are inverse class frequency on the combined training set. The checkpoint with the best dev
 macro-F1 (over all 7 classes) is kept. Afterwards the trained model and the keyword fallback are
 evaluated on the test split and everything is written to ``<out>/metrics.json``.
 A single ``--data`` file (random stratified split) is also supported.
@@ -52,6 +53,7 @@ def train(
     n_boot: int = 1000,
     checkpoint_dir: str | None = None,
     resume: bool = False,
+    extra_train: list[str] | None = None,
 ) -> dict:
     import numpy as np
     import torch
@@ -86,6 +88,14 @@ def train(
         label_dataset = None
     else:
         raise SystemExit("Pass --train, --val and --test (or a single --data file).")
+
+    # extra training-only data (e.g. LLM-generated romanised posts); labels must already be AquaAlert labels
+    extra_counts = {}
+    for path in extra_train or []:
+        xs, ys = _encode(load_labeled(path))
+        x_tr, y_tr = x_tr + xs, y_tr + ys
+        extra_counts[str(path)] = len(xs)
+        print(f"added {len(xs)} extra training posts from {path}")
 
     weights = inverse_frequency_weights(y_tr)
     tok = AutoTokenizer.from_pretrained(base_model)
@@ -159,6 +169,7 @@ def train(
     result["training"] = {
         "base_model": base_model, "epochs": epochs, "batch_size": batch_size, "lr": lr,
         "max_length": max_length, "seed": seed, "n_train": len(x_tr), "n_dev": len(x_va),
+        "extra_train": extra_counts,
         "class_weights": dict(zip(LABELS, weights)),
         "dev_history": history,
         "best_checkpoint": trainer.state.best_model_checkpoint,
@@ -184,10 +195,13 @@ def main() -> None:
     p.add_argument("--max-length", type=int, default=96)
     p.add_argument("--checkpoint-dir", default=None, help="where Trainer writes checkpoints (e.g. on Google Drive)")
     p.add_argument("--resume", action="store_true", help="resume from the last checkpoint in --checkpoint-dir")
+    p.add_argument("--extra-train", action="append", default=None, metavar="CSV",
+                   help="extra training-only file with text,label columns (repeatable), "
+                        "e.g. data/processed/romanised_humaid.csv")
     a = p.parse_args()
     train(a.out, a.train_path, a.val_path, a.test_path, a.data, a.label_dataset, a.base_model,
           a.epochs, a.batch_size, a.lr, a.max_length,
-          checkpoint_dir=a.checkpoint_dir, resume=a.resume)
+          checkpoint_dir=a.checkpoint_dir, resume=a.resume, extra_train=a.extra_train)
 
 
 if __name__ == "__main__":

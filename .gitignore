@@ -12,3 +12,5 @@ models/*
 data/docs/*
 !data/docs/.gitkeep
 !data/docs/sources.json
+data/processed/romanised_cache.jsonl
+data/processed/romanised_preview.csv

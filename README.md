@@ -189,6 +189,23 @@ supply requests. **Recommendation:** before retraining, collect a few hundred re
 mixed in; native-script performance does not justify retraining on its own. Language-ID accuracy is on the same
 synthetic posts the lexicons were developed against, so treat it as optimistic.
 
+### Romanised training data (LLM-generated)
+`scripts/make_romanised_data.py` builds `data/processed/romanised_humaid.csv`: HumAID **train** tweets rewritten by
+Gemini (`gemini-3.5-flash-lite`) into romanised, code-mixed Hindi, Malayalam and Bengali social-media posts, about
+1,500 per language. **This data is LLM-generated, not real posts.** Every `rescue_needed` and `missing_person` train
+tweet is included in each language and the remaining quota is a class-proportional sample of the rest; each row keeps
+the AquaAlert label, the source row ID (`humaid-train-<row>`, because the HF mirror has no tweet IDs) and the source text.
+Dev and test tweets are never used (the script refuses those files and drops train tweets whose text also appears in
+dev/test). Rewrites are validated (Latin script only, not a copy, sensible length; RT/@mentions/URLs stripped) and
+cached, so a run can be resumed.
+
+Known limits: the sources are global disasters (US hurricanes, Nepal earthquakes...), so many posts are "romanised
+Hindi about Hurricane Harvey" rather than about Kerala; labels are assumed to survive the rewrite (spot-check
+`--preview` output); spelling is casual and place names can be misspelt. Train with it via
+`python -m aquaalert.classify.train ... --extra-train data/processed/romanised_humaid.csv` (training data only; dev and
+test stay HumAID), or `USE_ROMANISED = True` in `notebooks/train_colab.ipynb`, which also evaluates the 44 hand-written
+multilingual posts and uploads to `<user>/aquaalert-muril-romanised`.
+
 ## Credibility (heuristic, not a trained model)
 `credibility/heuristics.py` gives every post a **misinformation score from 0 (no red flags) to 1** from transparent
 rules, and lists the reasons on the dashboard (table column and map popup; flagged markers are hollow and dashed).
