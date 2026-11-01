@@ -120,11 +120,13 @@ html("".join(T.dataset_chip(k) + " " for k in MODES[mode][1]))
 official_alerts: list = []
 live_status: dict = {}
 live_counts: dict = {}
+sim_active = 0
 live_updated = None
 window_h = 24
 if mode == "live":
     from datetime import datetime, timedelta, timezone
 
+    from aquaalert.ingest import simulate
     from aquaalert.ingest.live import SOURCES, to_posts
 
     store = _live_store(_live_db_path())
@@ -134,6 +136,7 @@ if mode == "live":
     items = store.items(since=now_utc - timedelta(hours=window_h))
     official_alerts = [i for i in items if i.kind == "official_alert"]
     live_counts = {s: sum(1 for i in items if i.source == s) for s in SOURCES}  # real sources only
+    sim_active = sum(1 for i in items if i.source == simulate.SIM_SOURCE)
     live_status, live_updated = store.status(), store.last_updated()
     raw_posts = to_posts(items)
     posts = _processed_live(tuple((p.id, p.text) for p in raw_posts), raw_posts) if raw_posts else []
@@ -238,6 +241,17 @@ if mode == "live":
         st.session_state["live_snapshot"] = snapshot
 
     _auto_refresh()
+    with st.sidebar.expander("Simulate incident", expanded=sim_active > 0):
+        st.caption(f"Injects {len(simulate.SIM_POSTS)} clearly synthetic posts (Hinglish rescue request, Malayalam SOS, "
+                   "offer of boats, missing person, dam-breach rumour, …) into the live pipeline. They carry a "
+                   "SIMULATED badge and are never counted as SACHET, news or Bluesky items.")
+        if st.button("Simulate incident", key="sim_inject"):
+            simulate.inject(store)
+            st.rerun()
+        if st.button(f"Clear simulated posts ({sim_active})", key="sim_clear", disabled=sim_active == 0):
+            simulate.clear(store)
+            st.rerun()
+
 df = posts_to_frame(visible)
 mapped = int(df["lat"].notna().sum()) if len(df) else 0
 rescue = [p for p in analysed if p.label and p.label.value == "rescue_needed"]
@@ -291,7 +305,7 @@ with tab_map:
                                                            help="Heuristic misinformation score (0 = no red flags)"),
                 "text": st.column_config.TextColumn("text", width="large"),
                 "misinfo_reasons": st.column_config.TextColumn("misinfo reasons", width="medium"),
-                "source": st.column_config.TextColumn("source", help="where the post came from"),
+                "source": st.column_config.TextColumn("source", help="SIMULATED = injected by 'Simulate incident'"),
                 "link": st.column_config.LinkColumn("link", display_text="open ↗"),
             },
         )

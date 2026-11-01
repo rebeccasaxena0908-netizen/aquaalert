@@ -17,6 +17,25 @@ Timings are a guide; the bold lines are what to say, the rest is what to do.
 | 6 | Load the dashboard once before presenting (first load classifies and geocodes 110 posts) and wait for the map tiles. | Avoids a spinner on stage. |
 | 7 | Sidebar → **Replay time** → **Aug 15, 22:40**. Optional: **Pause background** on if you are screen-recording. | At this time the KPI row reads **105 posts · 17 rescue requests · 4 warnings · 4 low-credibility**. |
 
+### Pre-demo checklist for Live mode (optional segment)
+
+1. **30 minutes before:** start the dashboard and pick **Dataset → LIVE · NDMA SACHET, news, Bluesky** (or start it
+   with `AQUAALERT_MODE=live streamlit run dashboard/app.py`). The background poller needs a few polls to fill the
+   store; the first SACHET poll can take several minutes.
+2. **Check the SACHET card** under the header: `ok` with a recent "last success" time is good. `error` or a backoff
+   note means the feed is slow or down: open
+   <https://sachet.ndma.gov.in/cap_public_website/rss/rss_india.xml> in a browser to confirm, and plan to use Replay.
+   The News (GDELT) card may show `error` when GDELT is rate-limiting; Bluesky shows `not configured` without an app
+   password. Both are fine for the demo.
+3. **Check the Gemini key**: ask the chatbot one question. An HTTP 429 / timeout notice means briefs and chat will use
+   the offline fallback.
+4. **Expect sparse data.** Outside a flood, Live mode may honestly show "No flood-related items in the last 24h" or
+   only official alerts. Use **Simulate incident** (sidebar) to show the pipeline reacting: 8 posts appear with a
+   SIMULATED badge, Alappuzha goes to WATCH, the dam rumour is flagged, the boats offer matches rescue requests.
+   Say clearly that they are simulated, and press **Clear simulated posts** afterwards.
+5. **Fallback:** if anything live misbehaves, switch **Dataset → REPLAY · Kerala Aug 2018 sample** and continue with the
+   script below; nothing else changes.
+
 ---
 
 ## 0:00 – 0:40 · The problem

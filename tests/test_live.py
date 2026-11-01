@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from aquaalert.ingest import live as L
+from aquaalert.ingest import simulate as S
 
 FIX = Path(__file__).resolve().parent / "fixtures" / "live"
 NOW = datetime(2026, 11, 1, 16, 30, tzinfo=timezone.utc)
@@ -221,3 +222,13 @@ def test_flood_prefilter_multilingual():
         assert L.is_flood_related(t), t
     for t in ("cricket final in Kochi", "new phone launch", "stock market flooded with orders?"):
         assert L.is_flood_related(t) == ("flood" in t.lower()), t
+
+
+# ---------------------------------------------------------------- simulated incident
+def test_simulated_incident_inject_and_clear(tmp_path):
+    st = L.LiveStore(tmp_path / "l.sqlite")
+    st.add([item(1)], NOW)
+    assert S.inject(st, NOW) == len(S.SIM_POSTS) and 5 <= len(S.SIM_POSTS) <= 8
+    sims = [i for i in st.items() if i.source == "simulated"]
+    assert all(i.id.startswith("sim-") and i.url == "" and i.extra.get("simulated") for i in sims)
+    assert S.clear(st) == len(S.SIM_POSTS) and [i.source for i in st.items()] == ["news"]  # real data untouched

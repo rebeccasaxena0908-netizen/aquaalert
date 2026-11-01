@@ -195,7 +195,7 @@ def test_live_mode_empty_state_never_pads_with_samples(monkeypatch, tmp_path):
     assert 'class="aa-ds aa-ds-live"' in html and 'class="aa-ds aa-ds-synthetic"' not in html
 
 
-def test_live_mode_sources_and_official_alerts(monkeypatch, tmp_path):
+def test_live_mode_sources_official_alerts_and_simulation(monkeypatch, tmp_path):
     from datetime import datetime, timedelta, timezone
 
     from aquaalert.ingest.live import LiveItem, LiveStore, parse_cap
@@ -217,6 +217,13 @@ def test_live_mode_sources_and_official_alerts(monkeypatch, tmp_path):
     assert "Official alert" in html and "Periyar river above danger level" in html and "CAP source" in html
     assert "No flood-related items" not in html and kpis(at)["posts"] == 1
 
+    at.sidebar.button(key="sim_inject").click().run()
+    k = kpis(at)
+    assert not at.exception and k["posts"] == 1 + 8 and k["flagged"] >= 1  # the dam-breach rumour
+    assert source_counts(at) == {"sachet": 1, "news": 1, "bluesky": 0}  # simulated posts never counted as sources
+    assert re.search(r"[1-9]\d* matches", page_html(at))  # the boats offer matches rescue requests
+    at.sidebar.button(key="sim_clear").click().run()
+    assert kpis(at)["posts"] == 1
 
 
 def test_replay_sample_is_marked_synthetic(monkeypatch):
@@ -226,3 +233,16 @@ def test_replay_sample_is_marked_synthetic(monkeypatch):
     html = page_html(at)
     assert 'class="aa-ds aa-ds-replay"' in html and 'class="aa-ds aa-ds-synthetic"' in html
     assert 'class="aa-ds aa-ds-live"' not in html
+
+
+def test_simulated_badge_in_popup_and_table(tmp_path):
+    from aquaalert.classify.zeroshot import KeywordZeroShot
+    from aquaalert.ingest.live import to_posts
+    from aquaalert.ingest.simulate import simulated_items
+    from aquaalert.pipeline import process_posts
+
+    posts = process_posts(to_posts(simulated_items()), KeywordZeroShot(), Geocoder(cache_path=tmp_path / "g.json", online=False))
+    assert all(p.source == "simulated" for p in posts)
+    rendered = build_map(posts).get_root().render()
+    assert rendered.count("aa-badge aa-sim") == sum(1 for p in posts if p.extraction and p.extraction.geo)
+    assert set(posts_to_frame(posts)["source"]) == {"SIMULATED"}

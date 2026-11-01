@@ -22,7 +22,7 @@ language → classify → extract → credibility over a list of posts.
 
 | Module | Role | Key files | Needs |
 |---|---|---|---|
-| `ingest/` | Load CSV/JSON/JSONL datasets; replay a dataset in time order; **Live mode** polling of NDMA SACHET, GDELT news and Bluesky into SQLite | `loader.py`, `replay.py`, `live.py` | Bluesky app password optional |
+| `ingest/` | Load CSV/JSON/JSONL datasets; replay a dataset in time order; **Live mode** polling of NDMA SACHET, GDELT news and Bluesky into SQLite; simulated incidents | `loader.py`, `replay.py`, `live.py`, `simulate.py` | Bluesky app password optional |
 | `language/` | Language ID: native Indic scripts by Unicode block, romanised Hindi/Malayalam/Bengali by lexicon; code-mixing flag; per-language evaluation | `detect.py`, `evaluate.py` | – |
 | `classify/` | 7-class crisis classifier. Fine-tuned MuRIL → embed_lr baseline → keyword fallback (auto); distress rule layer; HumAID label mapping; training + evaluation | `model.py`, `rules.py`, `train.py`, `embed_lr.py`, `label_map.py` | MuRIL weights (`scripts/fetch_model.py`) optional |
 | `extract/` | Places (Latin + Malayalam/Devanagari/Bengali names), phones, people counts; offline gazetteer + cached Nominatim; district lookup | `entities.py`, `gazetteer.py`, `geocode.py` | – |
@@ -125,6 +125,12 @@ password). Restart the dashboard.
   Nominatim is enabled (`AQUAALERT_GEOCODE_ONLINE=true`). SACHET areas are often free text ("At isolated places").
 - **Warnings.** The bundled sensor files cover August 2018 only, so live warnings use post volume alone (a spike is a
   WATCH); official SACHET alerts are shown separately as "Official alert" entries in the Warnings tab.
+
+**Simulate incident** (Live mode, sidebar): injects 8 clearly synthetic posts — a Hinglish rooftop rescue request,
+a Malayalam SOS, two English rescue requests (Kuttanad, Edathua), an offer of boats, a relief-camp supply request, a
+missing-person post and a dam-breach rumour — into the live store. They go through the normal pipeline (classifier,
+distress rules, credibility, matching, warnings), carry a **SIMULATED** badge in the table, map popups and briefs,
+are excluded from the real source counts, and **Clear simulated posts** removes them in one click.
 
 ## Early warnings (fuse/)
 For each district and day, rescue + damage posts are counted (posts with a misinformation score ≥ 0.5 don't count) and
