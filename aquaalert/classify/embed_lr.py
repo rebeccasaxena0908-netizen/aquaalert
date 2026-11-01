@@ -20,7 +20,7 @@ from aquaalert.schemas import LABELS
 
 ENCODER = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 LABEL2ID = {l: i for i, l in enumerate(LABELS)}
-C_GRID = (0.1, 1.0, 10.0)
+C_GRID = (10.0, 30.0, 100.0, 300.0)  # an earlier run over (0.1, 1, 10) peaked at the top, C=10
 
 
 def pick_device() -> str:
@@ -66,7 +66,8 @@ class EmbedLRClassifier:
 
 
 def train_embed(train_path: str, val_path: str, test_path: str, out: str,
-                label_dataset: str | None = None, encoder_name: str = ENCODER, n_boot: int = 1000) -> dict:
+                label_dataset: str | None = None, encoder_name: str = ENCODER, n_boot: int = 1000,
+                c_grid: tuple[float, ...] = C_GRID, only_if_better: bool = False) -> dict | None:
     import joblib
     from sklearn.linear_model import LogisticRegression
 
@@ -85,7 +86,7 @@ def train_embed(train_path: str, val_path: str, test_path: str, out: str,
 
     best = (-1.0, None, None)  # dev macro-F1, C, model
     grid = {}
-    for c in C_GRID:
+    for c in c_grid:
         lr = LogisticRegression(C=c, class_weight="balanced", max_iter=2000).fit(x_tr, y_tr)
         f1 = full_report(y_va.tolist(), lr.predict(x_va).tolist(), n_boot=1)["macro_f1_all7"]
         grid[str(c)] = f1
@@ -93,6 +94,16 @@ def train_embed(train_path: str, val_path: str, test_path: str, out: str,
             best = (f1, c, lr)
         print(f"C={c}: dev macro-F1 (all 7) = {f1:.4f}")
     dev_f1, c, lr = best
+
+    metrics_path = out_dir / "metrics.json"
+    previous = json.loads(metrics_path.read_text()) if metrics_path.exists() else None
+    prev_dev = previous["training"]["best_dev_macro_f1"] if previous else None
+    if only_if_better and prev_dev is not None and dev_f1 <= prev_dev:
+        print(f"No dev improvement ({dev_f1:.4f} <= {prev_dev:.4f}); keeping existing model and metrics.")
+        return None
+    if previous:
+        # keep earlier grid points so the full search history stays in metrics.json
+        grid = {**previous["training"]["C_grid_dev_macro_f1"], **grid}
 
     joblib.dump({"lr": lr, "classes": [int(k) for k in lr.classes_]}, out_dir / "classifier.joblib")
     (out_dir / "meta.json").write_text(json.dumps({"encoder": encoder_name, "labels": LABELS}, indent=2))
@@ -102,8 +113,8 @@ def train_embed(train_path: str, val_path: str, test_path: str, out: str,
     result["training"] = {"encoder": encoder_name, "class_weight": "balanced (inverse frequency)",
                           "C_grid_dev_macro_f1": grid, "best_C": c, "best_dev_macro_f1": dev_f1,
                           "n_train": len(tr), "n_dev": len(va)}
-    (out_dir / "metrics.json").write_text(json.dumps(result, indent=2))
-    print(f"wrote {out_dir / 'metrics.json'}")
+    metrics_path.write_text(json.dumps(result, indent=2))
+    print(f"wrote {metrics_path}")
     return result
 
 
@@ -114,8 +125,12 @@ def main() -> None:
     p.add_argument("--test", dest="test_path", required=True)
     p.add_argument("--out", default="models/embed_lr")
     p.add_argument("--label-dataset", choices=["humaid", "trec_is"], default=None)
+    p.add_argument("--c-grid", type=float, nargs="+", default=list(C_GRID))
+    p.add_argument("--only-if-better", action="store_true",
+                   help="leave the saved model/metrics untouched unless dev macro-F1 improves")
     a = p.parse_args()
-    train_embed(a.train_path, a.val_path, a.test_path, a.out, a.label_dataset)
+    train_embed(a.train_path, a.val_path, a.test_path, a.out, a.label_dataset,
+                c_grid=tuple(a.c_grid), only_if_better=a.only_if_better)
 
 
 if __name__ == "__main__":
