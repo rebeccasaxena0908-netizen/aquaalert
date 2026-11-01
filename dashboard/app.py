@@ -15,7 +15,7 @@ from aquaalert.extract.geocode import Geocoder  # noqa: E402
 from aquaalert.ingest.loader import load_posts  # noqa: E402
 from aquaalert.pipeline import process_posts  # noqa: E402
 from aquaalert.match.matcher import default_encoder, match_posts  # noqa: E402
-from aquaalert.chatbot.rag import brief_passages, default_chatbot  # noqa: E402
+from aquaalert.chatbot.rag import AUDIENCE_LABEL, brief_passages, default_chatbot  # noqa: E402
 from aquaalert.summarize.brief import daily_briefs  # noqa: E402
 from aquaalert.summarize.providers import TemplateProvider, get_provider  # noqa: E402
 from dashboard.helpers import LABEL_COLORS, build_map, build_match_map, posts_to_frame  # noqa: E402
@@ -170,8 +170,12 @@ with tab_chat:
             if msg.get("citations"):
                 with st.expander("Sources"):
                     for c in msg["citations"]:
-                        where = f"{c['source']}, p. {c['page']}" if c["page"] else c["source"]
-                        st.markdown(f"**[{c['n']}] {where}**" + (f" ({c['ref']})" if c.get("ref") else "") + f"  \n{c['excerpt']}")
+                        name = c.get("title") or c["source"]
+                        where = f"{name}, p. {c['page']}" if c["page"] else name
+                        where = f"[{where}]({c['url']})" if c.get("url") else where
+                        tag = AUDIENCE_LABEL.get(c.get("audience"), "")
+                        st.markdown(f"**[{c['n']}]** {where} · _{tag}_" + (f" ({c['ref']})" if c.get("ref") else "")
+                                    + f"  \n{c['excerpt']}")
     if question := st.chat_input("Ask a question (English, Hindi, ...)"):
         history.append({"role": "user", "text": question})
         ans = bot.ask(question)

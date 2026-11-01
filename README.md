@@ -75,14 +75,24 @@ the most relevant passages instead. Passages and the question are treated as unt
 passages that weren't retrieved are stripped, and answers are cached in `data/cache/chat.json`. The FAISS index is
 cached in `data/cache/chatbot/` and rebuilt automatically when files in `data/docs/` change.
 
-Put these in `data/docs/` (git-ignored); both links were checked on 2026-11-01:
-- NDMA *National Disaster Management Guidelines: Management of Floods* (2008), 166 pages, a copy hosted by Goa SDMA:
-  https://sdma.goa.gov.in/sites/default/files/2022-05/flood.pdf
-- A one-page citizen do's and don'ts sheet (before / during / after a flood), from Manipur SDMA:
-  https://msdma.mn.gov.in/uploads/site1/docs/Floods.pdf
+Each document is tagged in `data/docs/sources.json` as **citizen guidance** (household do's and don'ts) or a
+**policy document** (written for governments). Personal-safety questions always get up to two citizen passages, and
+questions about government/agency action (state, district, NDRF, plans, forecasting...) get policy passages; the prompt
+tells the model to answer from the matching kind. Untagged files are guessed from their name and wording.
 
-The NDMA guidelines are written for governments, so household questions are best served by do's-and-don'ts sheets like the
-second one. Add more by dropping PDFs/`.txt`/`.md` files into `data/docs/`.
+Download the verified documents (checked 2026-11-01) with `python scripts/fetch_docs.py`, which saves them into
+`data/docs/` (git-ignored apart from `sources.json`):
+
+| File | Audience | Source |
+|---|---|---|
+| `ndma_floods_dos_donts.html` | citizen | NDMA, *Floods: Do's & Don'ts* web page: https://ndma.gov.in/node/143 |
+| `manipur_sdma_floods.pdf` | citizen | Manipur SDMA one-page before/during/after sheet: https://msdma.mn.gov.in/uploads/site1/docs/Floods.pdf |
+| `ndma_guidelines_management_of_floods.pdf` | policy | NDMA *Guidelines: Management of Floods* (2008), Goa SDMA copy: https://sdma.goa.gov.in/sites/default/files/2022-05/flood.pdf |
+
+KSDMA's flood brochure (https://sdma.kerala.gov.in/wp-content/uploads/2018/11/5.Floods.pdf) is a scanned image with no
+text layer, so it can't be indexed without OCR, and its Bengali flood sheet is a JPEG. Supported formats: PDF (text
+layer), HTML (main `<article>` content), `.txt`, `.md`. Letter-spaced small-caps PDF headers are stripped during loading;
+chunks are ~450 characters so the 128-token multilingual encoder embeds each one in full.
 
 CLI: `python -m aquaalert.chatbot.ask "What should be in an emergency kit?"`
 

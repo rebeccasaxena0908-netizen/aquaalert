@@ -56,15 +56,19 @@ class KnowledgeBase:
         self.brief_passages = passages
         self.brief_index = _index(passages, self.encoder)
 
-    def search(self, query: str, k: int = 4, min_score: float = 0.0) -> list[tuple[Passage, float]]:
-        """Top-``k`` passages across guidelines and briefs, best first."""
+    def search(self, query: str, k: int = 4, min_score: float = 0.0,
+               audience: str | None = None) -> list[tuple[Passage, float]]:
+        """Top-``k`` passages across guidelines and briefs, best first (optionally only one ``audience``)."""
         q = np.ascontiguousarray(self.encoder([query]), dtype="float32")
         hits: list[tuple[Passage, float]] = []
         for index, passages in ((self.doc_index, self.doc_passages), (self.brief_index, self.brief_passages)):
             if index is None:
                 continue
-            scores, ids = index.search(q, min(k, index.ntotal))
-            hits += [(passages[i], float(s)) for s, i in zip(scores[0], ids[0]) if i >= 0 and s >= min_score]
+            # flat index: scanning everything for an audience filter costs ~nothing at this size
+            n = index.ntotal if audience else min(k, index.ntotal)
+            scores, ids = index.search(q, n)
+            hits += [(passages[i], float(s)) for s, i in zip(scores[0], ids[0])
+                     if i >= 0 and s >= min_score and (audience is None or passages[i].audience == audience)]
         return sorted(hits, key=lambda h: -h[1])[:k]
 
     @property

@@ -195,3 +195,23 @@ def test_failed_llm_falls_back_to_offline_briefs_without_caching(posts, tmp_path
     assert len(calls) == 1  # stopped hammering the API after the first failure
     assert len(briefs) > 3 and all(b.provider == "template" and b.fallback_reason == "LLM request failed: HTTP 503" for b in briefs)
     assert all(b.summary for b in briefs) and not cache.exists()
+
+
+
+def test_comma_separated_brief_citations(posts, tmp_path):
+    from aquaalert.summarize.brief import _verify_citations
+
+    text, dropped = _verify_citations("Boats needed [s001, s999]. See [map legend].", {"s001"})
+    assert text == "Boats needed [s001]. See [map legend]." and dropped == ["s999"]
+
+
+
+@pytest.mark.parametrize("exc", [__import__("http.client").client.RemoteDisconnected("closed"),
+                                 ConnectionResetError("reset")])
+def test_connection_errors_become_runtime_errors(monkeypatch, exc):
+    def broken(req, timeout):
+        raise exc
+
+    monkeypatch.setattr("urllib.request.urlopen", broken)
+    with pytest.raises(RuntimeError, match="LLM request failed"):
+        post_json("https://example.org/x", {"Authorization": "Bearer secret"}, {})

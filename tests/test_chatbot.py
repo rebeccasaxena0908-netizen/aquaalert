@@ -1,9 +1,10 @@
 import numpy as np
 import pytest
 
-from aquaalert.chatbot.docs import Passage, chunk_text, docs_fingerprint, load_documents
+from aquaalert.chatbot.docs import (CHUNK_CHARS, Passage, chunk_text, docs_fingerprint, html_to_text, load_documents,
+                                    strip_spaced_headings)
 from aquaalert.chatbot.index import KnowledgeBase
-from aquaalert.chatbot.rag import Chatbot, brief_passages, build_prompt
+from aquaalert.chatbot.rag import SYSTEM_PROMPT, Chatbot, brief_passages, build_prompt, question_kind, select_passages
 from aquaalert.match.matcher import hashing_encoder
 from aquaalert.summarize.brief import DistrictBrief, SourceRef
 from aquaalert.summarize.providers import AnthropicProvider, GeminiProvider, TemplateProvider
@@ -131,7 +132,7 @@ def test_llm_answer_prompt_citation_check_and_cache(docs, tmp_path):
     payload = http.calls[0]
     assert "untrusted" in payload["system"] and "112" in payload["system"]
     user = payload["messages"][0]["content"]
-    assert "<passages>" in user and "[1] (guide.pdf, p. 2)" in user and q in user
+    assert "<passages>" in user and "[1] (policy document · guide.pdf, p. 2)" in user and q in user
     assert "[9]" not in ans.text and "[1]" in ans.text and ans.mode == "llm" and not ans.cached
     assert [c.n for c in ans.citations] == [1]
     again = bot.ask(q)
@@ -141,7 +142,8 @@ def test_llm_answer_prompt_citation_check_and_cache(docs, tmp_path):
 def test_build_prompt_numbers_passages():
     hits = [(Passage(text="A", source="a.pdf", page=3), 0.9), (Passage(text="B", source="b.txt"), 0.8)]
     p = build_prompt("q?", hits)
-    assert "[1] (a.pdf, p. 3) A" in p and "[2] (b.txt) B" in p and p.endswith("Question: q?")
+    assert "[1] (policy document · a.pdf, p. 3) A" in p and "[2] (policy document · b.txt) B" in p
+    assert p.endswith("Question: q?")
 
 
 def test_chatbot_reuses_gemini_provider(docs, tmp_path):
@@ -155,7 +157,7 @@ def test_chatbot_reuses_gemini_provider(docs, tmp_path):
     ans = bot.ask("boil drinking water after the flood")
     url, headers, payload = calls[0]
     assert url.endswith("/v1beta/openai/chat/completions") and payload["model"] == "gemini-3.5-flash-lite"
-    assert "untrusted" in payload["messages"][0]["content"] and "[1] (guide.pdf, p. 2)" in payload["messages"][1]["content"]
+    assert "untrusted" in payload["messages"][0]["content"] and "[1] (policy document · guide.pdf, p. 2)" in payload["messages"][1]["content"]
     assert ans.mode == "llm" and ans.provider == "gemini" and [c.n for c in ans.citations] == [1]
 
 
@@ -167,3 +169,89 @@ def test_chatbot_falls_back_to_passages_when_llm_fails(docs, tmp_path):
     ans = bot.ask("boil drinking water after the flood")
     assert ans.mode == "offline" and ans.fallback_reason and "timed out" in ans.text and ans.citations
     assert not (tmp_path / "chat.json").exists()
+
+
+
+def test_strip_spaced_headings_keeps_prose():
+    header = "na t i o n a l DiSaSt e r ma n a g e m e n t gu iDe l i n eS: The central government shall act."
+    assert strip_spaced_headings(header).strip().startswith("The central government shall act")
+    for prose in ("it is up to me to go", "Rs 5 lakh to 3 of 4 HQs", "CWC & IMD in J & K", "plan A or B or C by 2 pm"):
+        assert strip_spaced_headings(prose) == prose
+
+
+def test_html_loader_reads_article_only(tmp_path):
+    d = tmp_path / "docs"
+    d.mkdir()
+    (d / "page.html").write_text(
+        "<html><head><title>Floods: Do's & Don'ts</title><script>var x=1;</script></head><body>"
+        "<nav>Home | About | Contact menu</nav><article><h2>What to do during a flood</h2>"
+        "<p>Do not walk through moving water. Six inches of moving water can make you fall.</p>"
+        "<p>Move immediately to higher ground if there is any possibility of a flash flood.</p></article>"
+        "<footer>Copyright</footer></body></html>")
+    text = html_to_text((d / "page.html").read_text())
+    assert "moving water" in text and "menu" not in text and "var x" not in text and "Copyright" not in text
+    ps = load_documents(d)
+    assert ps and ps[0].audience == "citizen"  # guessed from "Do's & Don'ts"/"during"
+
+
+def test_sources_json_sets_title_url_audience(tmp_path):
+    d = tmp_path / "docs"
+    d.mkdir()
+    (d / "a.txt").write_text("Governments shall prepare flood management plans for every river basin in the state.")
+    (d / "sources.json").write_text('{"a.txt": {"title": "Guide A", "url": "https://example.org/a", "audience": "citizen"}}')
+    p = load_documents(d)[0]
+    assert (p.title, p.url, p.audience, p.citation()) == ("Guide A", "https://example.org/a", "citizen", "Guide A")
+    (d / "sources.json").write_text("{not json")
+    assert load_documents(d)[0].audience == "policy"  # malformed metadata ignored, guess used
+
+
+def test_chunks_fit_encoder_window_and_change_fingerprint(docs):
+    long = " ".join(f"Sentence {i} explains a flood safety measure in some detail." for i in range(80))
+    assert all(len(c) <= CHUNK_CHARS + 80 for c in chunk_text(long))
+    assert docs_fingerprint(docs).startswith(f"chunk={CHUNK_CHARS}/")
+
+
+def test_question_kind():
+    assert question_kind("What is the role of the state government in flood forecasting?") == "policy"
+    assert question_kind("What should NDRF do during evacuation?") == "policy"
+    assert question_kind("Should I walk through flood water?") == "personal"
+    assert question_kind("बाढ़ से पहले क्या तैयारी करनी चाहिए?") == "personal"
+    assert question_kind("सरकार क्या कर रही है?") == "policy"
+
+
+def _p(aud, score, text="x"):
+    return (Passage(text=text, source=aud, audience=aud), score)
+
+
+def test_select_passages_guarantees_preferred_audience():
+    hits = [_p("policy", 0.9), _p("policy", 0.8), _p("policy", 0.7), _p("policy", 0.6), _p("citizen", 0.5), _p("citizen", 0.4)]
+    personal = select_passages(hits, "personal", k=4)
+    assert [p.audience for p, _ in personal].count("citizen") == 2 and len(personal) == 4
+    assert [s for _, s in personal] == sorted((s for _, s in personal), reverse=True)
+    assert [p.audience for p, _ in select_passages(hits, "policy", k=4)] == ["policy"] * 4
+    only_policy = [_p("policy", 0.9), _p("policy", 0.8)]
+    assert select_passages(only_policy, "personal", k=4) == only_policy  # nothing to promote
+    # a citizen passage found by the separate audience search is promoted even if it wasn't a candidate
+    crowded = [_p("policy", 0.9 - i / 100, f"p{i}") for i in range(10)]
+    out = select_passages(crowded, "personal", k=4, preferred=[_p("citizen", 0.2, "cross-lingual hit")])
+    assert len(out) == 4 and any(p.audience == "citizen" for p, _ in out)
+
+
+def test_audience_filtered_search(docs, tmp_path):
+    (docs / "sources.json").write_text('{"notes.txt": {"audience": "citizen"}}')
+    kb = make_kb(docs, tmp_path)
+    hits = kb.search("boil drinking water after the flood", k=3, audience="citizen")
+    assert hits and all(p.audience == "citizen" and p.source == "notes.txt" for p, _ in hits)
+
+
+def test_system_prompt_prioritises_citizen_guidance():
+    assert "citizen guidance" in SYSTEM_PROMPT and "policy document" in SYSTEM_PROMPT
+    assert "personal or family safety" in SYSTEM_PROMPT and "governments or agencies" in SYSTEM_PROMPT
+
+
+def test_comma_citations_are_validated(docs, tmp_path):
+    http = FakeHTTP("Boil water [1, 9]. Nothing valid here [7, 8].")
+    bot = Chatbot(make_kb(docs, tmp_path), AnthropicProvider("k", http=http), tmp_path / "chat.json")
+    ans = bot.ask("boil drinking water after the flood")
+    assert "[1]" in ans.text and "9" not in ans.text and "[7" not in ans.text
+    assert [c.n for c in ans.citations] == [1]

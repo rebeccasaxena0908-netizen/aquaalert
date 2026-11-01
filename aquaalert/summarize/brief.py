@@ -25,7 +25,7 @@ MAX_TEXT = 280
 PRIORITY = [Label.RESCUE_NEEDED, Label.MISSING_PERSON, Label.INFRASTRUCTURE_DAMAGE, Label.NEED_SUPPLIES,
             Label.OFFER_HELP, Label.INFO_UPDATE]
 _RANK = {l: i for i, l in enumerate(PRIORITY)}
-_CITE = re.compile(r"\[([^\[\]\s]+)\]")
+_CITE = re.compile(r"\[([^\[\]]+)\]")  # [s001] or [s001, s002]
 
 
 class SourceRef(BaseModel):
@@ -97,12 +97,14 @@ def _verify_citations(text: str, known: set[str]) -> tuple[str, list[str]]:
     dropped: list[str] = []
 
     def repl(m: re.Match) -> str:
-        if m.group(1) in known:
-            return m.group(0)
-        dropped.append(m.group(1))
-        return ""
+        ids = [i.strip() for i in m.group(1).split(",")]
+        if not all(re.fullmatch(r"[\w-]+", i) for i in ids):
+            return m.group(0)  # not a citation (e.g. "[see map]")
+        kept = [i for i in ids if i in known]
+        dropped.extend(i for i in ids if i not in known)
+        return f"[{', '.join(kept)}]" if kept else ""
 
-    return re.sub(r"\s{2,}", " ", _CITE.sub(repl, text)).strip(), dropped
+    return re.sub(r"[ \t]{2,}", " ", _CITE.sub(repl, text)).strip(), dropped
 
 
 def summarize_district(brief: BriefInput, shown: list[Post], provider: Provider, cache: _Cache | None) -> DistrictBrief:
@@ -118,7 +120,7 @@ def summarize_district(brief: BriefInput, shown: list[Post], provider: Provider,
             cache.put(key, text)
     by_id = {p.id: p for p in shown}
     text, dropped = _verify_citations(text, set(by_id))
-    cited = list(dict.fromkeys(i for i in _CITE.findall(text) if i in by_id))
+    cited = list(dict.fromkeys(i.strip() for g in _CITE.findall(text) for i in g.split(",") if i.strip() in by_id))
     source_posts = [by_id[i] for i in cited] or shown[:3]  # uncited summary: fall back to the top posts
     return DistrictBrief(
         district=brief.district, date=date.fromisoformat(brief.date), summary=text, counts=brief.counts,

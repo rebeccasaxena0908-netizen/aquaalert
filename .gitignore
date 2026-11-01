@@ -11,3 +11,4 @@ models/*
 !models/.gitkeep
 data/docs/*
 !data/docs/.gitkeep
+!data/docs/sources.json

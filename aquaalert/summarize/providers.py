@@ -1,6 +1,7 @@
 """Summary providers: an offline template plus Anthropic / OpenAI-compatible LLM backends."""
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import urllib.error
@@ -105,6 +106,8 @@ def post_json(url: str, headers: dict, payload: dict) -> dict:
         raise RuntimeError(f"LLM request failed: {exc.reason}") from None
     except TimeoutError:
         raise RuntimeError("LLM request timed out after 60s") from None
+    except (http.client.HTTPException, OSError) as exc:  # e.g. RemoteDisconnected, connection reset
+        raise RuntimeError(f"LLM request failed: {type(exc).__name__}") from None
 
 
 class AnthropicProvider:
