@@ -39,6 +39,12 @@ def test_plan_keeps_all_rare_and_stratifies_the_rest(humaid):
         labels = pd.Series([i["label"] for i in mine]).value_counts().to_dict()
         assert labels["rescue_needed"] == 3 and labels["missing_person"] == 4  # every rare tweet
         assert labels["offer_help"] == 13 and labels["infrastructure_damage"] == 7  # 20 split 2:1
+    floored = mrd.plan(df, per_language=27, langs=["hi"], seed=1, min_per_class=10)
+    counts = pd.Series([i["label"] for i in floored]).value_counts().to_dict()
+    assert counts["infrastructure_damage"] == 10 and counts["offer_help"] == 13  # raised to the floor / unchanged
+    assert counts["rescue_needed"] == 3  # rare classes: all available, even below the floor
+    capped = mrd.plan(df, per_language=27, langs=["hi"], seed=1, min_per_class=500)
+    assert pd.Series([i["label"] for i in capped]).value_counts()["infrastructure_damage"] == 20  # pool size cap
     hi_common = {i["source_id"] for i in items if i["lang"] == "hi" and i["label"] == "offer_help"}
     ml_common = {i["source_id"] for i in items if i["lang"] == "ml" and i["label"] == "offer_help"}
     assert hi_common != ml_common  # different common-class tweets per language
@@ -55,8 +61,17 @@ def test_valid(text, source, problem):
     assert mrd.valid(text, source) == problem
 
 
+def test_wrong_language_is_rejected():
+    hinglish = "Greek wildfires me ek Irish man missing hai, sabko dar lag raha hai"
+    assert mrd.valid(hinglish, "An Irish man is missing in the Greek wildfires", "bn-Latn") == "wrong language (hi-Latn)"
+    assert mrd.valid(hinglish, "An Irish man is missing in the Greek wildfires", "hi-Latn") is None
+    banglish = "Maryland floods e ekjon hero soldier bhese geche, rescuer ra take khujche"
+    assert mrd.valid(banglish, "Rescuers search for hero soldier swept away in Maryland floods", "bn-Latn") is None
+
+
 def test_clean_strips_rt_mentions_urls():
     assert mrd.clean("RT @AbbTakk: AJK quake me 22 log dead http://t.co/x via @news") == "AJK quake me 22 log dead via"
+    assert mrd.clean("RT ShashiTharoor: Trivandrum NGO relief collect kar rahi") == "Trivandrum NGO relief collect kar rahi"
 
 
 class FakeGemini:

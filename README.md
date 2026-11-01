@@ -191,20 +191,46 @@ synthetic posts the lexicons were developed against, so treat it as optimistic.
 
 ### Romanised training data (LLM-generated)
 `scripts/make_romanised_data.py` builds `data/processed/romanised_humaid.csv`: HumAID **train** tweets rewritten by
-Gemini (`gemini-3.5-flash-lite`) into romanised, code-mixed Hindi, Malayalam and Bengali social-media posts, about
-1,500 per language. **This data is LLM-generated, not real posts.** Every `rescue_needed` and `missing_person` train
-tweet is included in each language and the remaining quota is a class-proportional sample of the rest; each row keeps
-the AquaAlert label, the source row ID (`humaid-train-<row>`, because the HF mirror has no tweet IDs) and the source text.
-Dev and test tweets are never used (the script refuses those files and drops train tweets whose text also appears in
-dev/test). Rewrites are validated (Latin script only, not a copy, sensible length; RT/@mentions/URLs stripped) and
-cached, so a run can be resumed.
+Gemini (`gemini-3.5-flash-lite`) into romanised, code-mixed Hindi, Malayalam and Bengali social-media posts.
+**This data is LLM-generated, not real posts.** It is kept in this private repository only.
 
-Known limits: the sources are global disasters (US hurricanes, Nepal earthquakes...), so many posts are "romanised
-Hindi about Hurricane Harvey" rather than about Kerala; labels are assumed to survive the rewrite (spot-check
-`--preview` output); spelling is casual and place names can be misspelt. Train with it via
-`python -m aquaalert.classify.train ... --extra-train data/processed/romanised_humaid.csv` (training data only; dev and
-test stay HumAID), or `USE_ROMANISED = True` in `notebooks/train_colab.ipynb`, which also evaluates the 44 hand-written
-multilingual posts and uploads to `<user>/aquaalert-muril-romanised`.
+How it is built: for each language every `rescue_needed` and `missing_person` train tweet is used, and the other
+classes are sampled class-proportionally with a floor of 150 per class (plan: 1,637 per language, 4,911 total).
+Each row keeps the AquaAlert label, the source row ID (`humaid-train-<row>`, because the HF mirror has no tweet IDs)
+and the source text. Dev and test tweets are never used (the script refuses those files and drops train tweets whose
+text also appears in dev/test). Rewrites are rejected if they contain any Indic-script character, copy the source,
+have an implausible length, or read as another romanised language; RT prefixes, @mentions and URLs are stripped.
+Results are cached per row, so a rerun only fetches what is missing.
+
+Current file (2026-11-01): **4,552 rows** (hi-Latn 1,612, ml-Latn 1,539, bn-Latn 1,401), all passing the checks.
+
+| Class | hi-Latn | ml-Latn | bn-Latn | target per language |
+|---|---:|---:|---:|---:|
+| rescue_needed | 85 | 84 | **65** | 86 (all available) |
+| missing_person | 248 | 227 | **201** | 250 (all available) |
+| infrastructure_damage | 150 | 147 | **119** | 150 |
+| need_supplies | 148 | 142 | **127** | 150 |
+| offer_help | 316 | 305 | 317 | 326 |
+| info_update | 438 | 410 | 387 | 442 |
+| irrelevant | 227 | 224 | 185 | 233 |
+
+**Bengali is short** (bold): 194 Bengali rewrites (12 %) came back as Hinglish and were removed by the
+wrong-language check, and the top-up hit the Gemini quota (HTTP 429). To fill the gaps once the quota resets, rerun
+`python scripts/make_romanised_data.py`: it only requests the 359 missing rows (~36 requests).
+
+Quality, from a manual spot check of 30 random rows (10 per language):
+- **Label drift:** none seen; every rewrite still fits its label.
+- **Meaning drift: ~10 % (3/30).** One rewrite turned an argumentative reply into a plea for help, one added
+  urgency ("urgent zaroorat") the source didn't have, one added a comment. These can't be detected automatically, so
+  expect roughly one row in ten to be looser than its source.
+- **Language:** the wrong-language drift above was found here and is now filtered; light Hindi words inside Bengali
+  rows ("ke bachao") remain.
+- **Context:** the sources are global disasters (US hurricanes, Nepal earthquakes...), so many posts are e.g.
+  "romanised Hindi about Hurricane Harvey" rather than about Kerala; spelling is casual and place names can be misspelt.
+
+Use it only as training data: `python -m aquaalert.classify.train ... --extra-train data/processed/romanised_humaid.csv`
+(dev and test stay HumAID), or `USE_ROMANISED = True` in `notebooks/train_colab.ipynb`, which also evaluates the 44
+hand-written multilingual posts and uploads the model to `<user>/aquaalert-muril-romanised`.
 
 ## Credibility (heuristic, not a trained model)
 `credibility/heuristics.py` gives every post a **misinformation score from 0 (no red flags) to 1** from transparent
