@@ -40,9 +40,33 @@ def test_classify_posts_fills_fields(make_post):
 
 def test_get_classifier_falls_back_without_model(monkeypatch, tmp_path):
     monkeypatch.setenv("AQUAALERT_MODEL_DIR", str(tmp_path / "missing"))
+    monkeypatch.setenv("AQUAALERT_EMBED_DIR", str(tmp_path / "missing2"))
     assert isinstance(get_classifier("auto"), KeywordZeroShot)
-    with pytest.raises(FileNotFoundError):
-        get_classifier("trained")
+    assert isinstance(get_classifier("zeroshot"), KeywordZeroShot)
+    for backend in ("trained", "muril", "embed_lr"):
+        with pytest.raises(FileNotFoundError):
+            get_classifier(backend)
+    with pytest.raises(ValueError):
+        get_classifier("bogus")
+
+
+def test_auto_prefers_muril_then_embed_lr(monkeypatch, tmp_path):
+    import aquaalert.classify.model as model_mod
+
+    muril, embed = tmp_path / "muril", tmp_path / "embed"
+    monkeypatch.setenv("AQUAALERT_MODEL_DIR", str(muril))
+    monkeypatch.setenv("AQUAALERT_EMBED_DIR", str(embed))
+    monkeypatch.setattr(model_mod, "TransformerClassifier", lambda p: ("muril", p))
+    import aquaalert.classify.embed_lr as embed_mod
+    monkeypatch.setattr(embed_mod, "EmbedLRClassifier", lambda p: ("embed", p))
+
+    embed.mkdir()
+    (embed / "classifier.joblib").write_text("x")
+    assert model_mod.get_classifier("auto") == ("embed", embed)  # only embed_lr present
+    muril.mkdir()
+    (muril / "config.json").write_text("{}")
+    assert model_mod.get_classifier("auto") == ("muril", muril)  # MuRIL wins when both exist
+    assert model_mod.get_classifier("embed_lr") == ("embed", embed)
 
 
 def test_splits():

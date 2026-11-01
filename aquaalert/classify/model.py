@@ -47,19 +47,37 @@ class TransformerClassifier:
 
 
 def get_classifier(backend: str | None = None) -> Classifier:
-    """Pick a classifier. ``auto`` uses the trained model if present, else zero-shot."""
+    """Pick a classifier.
+
+    ``auto`` prefers the fine-tuned MuRIL model, then the embedding+LR baseline, then the keyword
+    fallback. Explicit backends: ``muril`` (alias ``trained``), ``embed_lr``, ``zeroshot``.
+    """
     settings = get_settings()
     backend = backend or settings.classifier
-    has_model = (settings.model_dir / "config.json").exists()
-    if backend in ("auto", "trained") and has_model:
+    if backend == "trained":
+        backend = "muril"
+
+    candidates: list[tuple[str, Path, str]] = [
+        ("muril", settings.model_dir, "config.json"),
+        ("embed_lr", settings.embed_dir, "classifier.joblib"),
+    ]
+    for name, path, marker in candidates:
+        if backend not in ("auto", name):
+            continue
+        if not (path / marker).exists():
+            if backend == name:
+                raise FileNotFoundError(f"No {name} model at {path}")
+            continue
         try:
-            return TransformerClassifier(settings.model_dir)
-        except Exception as exc:  # missing torch, corrupt checkpoint, ...
-            if backend == "trained":
+            if name == "muril":
+                return TransformerClassifier(path)
+            from aquaalert.classify.embed_lr import EmbedLRClassifier
+
+            return EmbedLRClassifier(path)
+        except Exception as exc:  # missing deps, corrupt files, ...
+            if backend == name:
                 raise
-            log.warning("Could not load trained model (%s); using zero-shot fallback", exc)
-    elif backend == "trained":
-        raise FileNotFoundError(f"No trained model at {settings.model_dir}")
+            log.warning("Could not load %s (%s); trying the next backend", name, exc)
+    if backend not in ("auto", "zeroshot"):
+        raise ValueError(f"Unknown classifier backend: {backend}")
     return KeywordZeroShot()
-
-

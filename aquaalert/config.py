@@ -23,6 +23,7 @@ def _path(value: str) -> Path:
 class Settings:
     classifier: str
     model_dir: Path
+    embed_dir: Path
     base_model: str
     geocoder_user_agent: str
     geocode_online: bool
@@ -34,6 +35,7 @@ def get_settings() -> Settings:
     return Settings(
         classifier=os.getenv("AQUAALERT_CLASSIFIER", "auto"),
         model_dir=_path(os.getenv("AQUAALERT_MODEL_DIR", "models/muril")),
+        embed_dir=_path(os.getenv("AQUAALERT_EMBED_DIR", "models/embed_lr")),
         base_model=os.getenv("AQUAALERT_BASE_MODEL", "google/muril-base-cased"),
         geocoder_user_agent=os.getenv("AQUAALERT_GEOCODER_USER_AGENT", "aquaalert-dev"),
         geocode_online=os.getenv("AQUAALERT_GEOCODE_ONLINE", "false").lower() == "true",
