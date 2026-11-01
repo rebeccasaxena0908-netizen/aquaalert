@@ -46,11 +46,22 @@ class TransformerClassifier:
         return out
 
 
+TRANSFORMER_WEIGHTS = ("model.safetensors", "pytorch_model.bin")
+
+
+def _ready(path: Path, kind: str) -> bool:
+    """A model directory is usable only when its weights are there (a download writes config.json first)."""
+    if kind == "transformer":
+        return (path / "config.json").exists() and any((path / w).exists() for w in TRANSFORMER_WEIGHTS)
+    return (path / "classifier.joblib").exists()
+
+
 def get_classifier(backend: str | None = None) -> Classifier:
     """Pick a classifier.
 
-    ``auto`` prefers the fine-tuned MuRIL model, then the embedding+LR baseline, then the keyword
-    fallback. Explicit backends: ``muril`` (alias ``trained``), ``embed_lr``, ``zeroshot``.
+    ``auto`` prefers MuRIL fine-tuned with the romanised data, then the English-only MuRIL, then the
+    embedding+LR baseline, then the keyword fallback. Explicit backends: ``muril_romanised``, ``muril``
+    (alias ``trained``), ``embed_lr``, ``zeroshot``.
     """
     settings = get_settings()
     backend = backend or settings.classifier
@@ -58,18 +69,19 @@ def get_classifier(backend: str | None = None) -> Classifier:
         backend = "muril"
 
     candidates: list[tuple[str, Path, str]] = [
-        ("muril", settings.model_dir, "config.json"),
-        ("embed_lr", settings.embed_dir, "classifier.joblib"),
+        ("muril_romanised", settings.romanised_dir, "transformer"),
+        ("muril", settings.model_dir, "transformer"),
+        ("embed_lr", settings.embed_dir, "embed_lr"),
     ]
-    for name, path, marker in candidates:
+    for name, path, kind in candidates:
         if backend not in ("auto", name):
             continue
-        if not (path / marker).exists():
+        if not _ready(path, kind):
             if backend == name:
                 raise FileNotFoundError(f"No {name} model at {path}")
             continue
         try:
-            if name == "muril":
+            if kind == "transformer":
                 return TransformerClassifier(path)
             from aquaalert.classify.embed_lr import EmbedLRClassifier
 

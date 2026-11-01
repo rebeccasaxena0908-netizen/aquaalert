@@ -29,6 +29,7 @@ def dataset_paths(value: str) -> list[Path]:
 @dataclass(frozen=True)
 class Settings:
     classifier: str
+    romanised_dir: Path
     model_dir: Path
     embed_dir: Path
     base_model: str
@@ -44,6 +45,7 @@ class Settings:
 def get_settings() -> Settings:
     return Settings(
         classifier=os.getenv("AQUAALERT_CLASSIFIER", "auto"),
+        romanised_dir=_path(os.getenv("AQUAALERT_ROMANISED_DIR", "models/muril_romanised")),
         model_dir=_path(os.getenv("AQUAALERT_MODEL_DIR", "models/muril")),
         embed_dir=_path(os.getenv("AQUAALERT_EMBED_DIR", "models/embed_lr")),
         base_model=os.getenv("AQUAALERT_BASE_MODEL", "google/muril-base-cased"),

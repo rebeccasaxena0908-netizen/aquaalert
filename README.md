@@ -265,6 +265,47 @@ does what it says.
 Offline gazetteer first, then (if `AQUAALERT_GEOCODE_ONLINE=true`) Nominatim bounded to Kerala. Results are
 cached in `data/cache/geocode.json`.
 
+## Romanised model: before / after
+`<user>/aquaalert-muril-romanised` is MuRIL fine-tuned on HumAID train **plus the 4,552 LLM-generated romanised posts**
+(Kaggle T4, same recipe otherwise). Fetch it with
+`python scripts/fetch_model.py --repo <user>/aquaalert-muril-romanised --out models/muril_romanised`; with
+`AQUAALERT_CLASSIFIER=auto` it is preferred over `models/muril`, then `embed_lr`, then the keyword fallback.
+Numbers below were recomputed locally with `python scripts/compare_models.py` (distress rules off).
+
+| HumAID test (15,160 tweets) | MuRIL (English-only) | MuRIL + romanised data |
+|---|---:|---:|
+| Macro-F1, all 7 (95% CI) | 0.727 (0.700–0.752) | **0.736 (0.706–0.764)** |
+| Macro-F1, 5 large classes | 0.759 (0.750–0.768) | **0.763 (0.754–0.773)** |
+| Accuracy | 0.800 | 0.807 |
+| F1 `rescue_needed` | 0.571 | 0.558 |
+| F1 `missing_person` | 0.725 | 0.776 |
+| F1 `need_supplies` | 0.575 | 0.567 |
+
+| Hand-written posts (accuracy) | Posts | MuRIL (English-only) | MuRIL + romanised data |
+|---|---:|---:|---:|
+| English | 45 | 0.73 | **0.76** |
+| Hindi (Devanagari) | 9 | 0.89 | **1.00** |
+| Bengali (script) | 7 | 0.86 | **1.00** |
+| Malayalam (script) | 11 | 0.73 | **0.73** |
+| Hinglish | 9 | 0.44 | **0.67** |
+| Manglish | 7 | 0.43 | **0.86** |
+| Banglish | 6 | 0.17 | **0.50** |
+
+All numbers match what the Kaggle run printed and saved (`metrics.json`, `language_eval.json` in the model repo).
+
+Caveats:
+- **The per-language sets are tiny** (6–11 posts per language), so one post changes accuracy by 9–17 points; treat the
+  gains as directional, not measured.
+- **Training and test posts for the romanised languages are both LLM-written or hand-written by us**: the training
+  data is Gemini rewrites of HumAID tweets and the 44 test posts are synthetic, so they may share style that real
+  WhatsApp/Twitter text does not. The real test of this model is real romanised posts.
+- **Bengali training data is short of target** (1,401 rows; `rescue_needed` 65 and `missing_person` 201 of the
+  intended 86 and 250), and Banglish remains the weakest language.
+- HumAID test is English-only, so its change mainly shows the romanised data did not hurt English performance.
+- **Not everything improved:** `rescue_needed` F1 dips slightly (0.571 → 0.558, 22 test tweets) and so does
+  `need_supplies` (0.575 → 0.567); Malayalam script is unchanged; on the English sample the old model *with* the
+  distress rules (0.80) still beats the new one (0.76), where the rules no longer add anything.
+
 ## Results
 
 All three classifiers on the same HumAID test split (15,160 tweets, labels mapped to AquaAlert's 7 classes by
