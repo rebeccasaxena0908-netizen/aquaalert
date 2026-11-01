@@ -16,7 +16,8 @@ from pydantic import BaseModel, Field
 from aquaalert.config import get_settings
 from aquaalert.extract.entities import PHONE_RE
 from aquaalert.schemas import Label, Post
-from aquaalert.summarize.providers import BriefInput, BriefPost, Provider, build_user_prompt, get_provider
+from aquaalert.summarize.providers import (BriefInput, BriefPost, Provider, TemplateProvider, build_user_prompt,
+                                           get_provider)
 
 MAX_POSTS = 20  # posts shown to the model per district-day
 MAX_TEXT = 280
@@ -44,6 +45,7 @@ class DistrictBrief(BaseModel):
     model: str
     cached: bool = False
     dropped_citations: list[str] = Field(default_factory=list)  # ids the model cited that were not in the input
+    fallback_reason: str | None = None  # set when the LLM call failed and the offline template was used
 
 
 def _select(posts: list[Post]) -> list[Post]:
@@ -130,11 +132,19 @@ def daily_briefs(posts: list[Post], provider: Provider | None = None, cache_path
     """Briefs for every district-day (or one day), most rescue requests first."""
     provider = provider or get_provider()
     cache = _Cache(cache_path or get_settings().cache_dir / "summaries.json") if provider.uses_network else None
-    briefs = [
-        summarize_district(inp, shown, provider, cache)
-        for (district, d), (inp, shown) in build_inputs(posts).items()
-        if day is None or d == day
-    ]
+    briefs: list[DistrictBrief] = []
+    failure: str | None = None
+    for (district, d), (inp, shown) in build_inputs(posts).items():
+        if day is not None and d != day:
+            continue
+        if failure is None:
+            try:
+                briefs.append(summarize_district(inp, shown, provider, cache))
+                continue
+            except RuntimeError as exc:  # timeout / HTTP error / empty reply: stop calling the API this run
+                failure = str(exc)
+        fallback = summarize_district(inp, shown, TemplateProvider(), None)
+        briefs.append(fallback.model_copy(update={"fallback_reason": failure}))
     return sorted(briefs, key=lambda b: (-b.counts.get("rescue_needed", 0), b.district))
 
 

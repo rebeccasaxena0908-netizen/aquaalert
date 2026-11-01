@@ -5,6 +5,7 @@ from aquaalert.classify.label_map import map_label
 from aquaalert.classify.model import get_classifier
 from aquaalert.classify.train import build_splits
 from aquaalert.classify.zeroshot import KeywordZeroShot
+from aquaalert.extract.geocode import Geocoder
 from aquaalert.ingest.loader import load_posts
 from aquaalert.schemas import LABELS, Label
 
@@ -75,3 +76,20 @@ def test_splits():
     # a class with a single example must not break the split
     build_splits(list("abcdefghij"), [0] * 9 + [1], 0.2, 0)
     assert map_label("offer_help") == Label.OFFER_HELP
+
+
+def test_pipeline_respects_rules_flag(monkeypatch, tmp_path, make_post):
+    from aquaalert.pipeline import process_posts
+
+    class AlwaysOffer:
+        name = "offer"
+
+        def predict_scores(self, texts):
+            return [{**{l: 0.0 for l in LABELS}, "offer_help": 1.0} for _ in texts]
+
+    g = Geocoder(cache_path=tmp_path / "g.json", online=False)
+    post = make_post("Need rescue, we are stuck on the roof in Aluva")
+    monkeypatch.setenv("AQUAALERT_RULES", "on")
+    assert process_posts([post], AlwaysOffer(), g)[0].label == Label.RESCUE_NEEDED
+    monkeypatch.setenv("AQUAALERT_RULES", "off")
+    assert process_posts([post], AlwaysOffer(), g)[0].label == Label.OFFER_HELP

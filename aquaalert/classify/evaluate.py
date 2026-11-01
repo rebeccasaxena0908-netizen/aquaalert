@@ -11,24 +11,28 @@ from pathlib import Path
 
 from aquaalert.classify.base import Classifier
 from aquaalert.classify.metrics import format_table, full_report
+from aquaalert.classify.rules import apply_rules
 from aquaalert.classify.zeroshot import KeywordZeroShot
 from aquaalert.ingest.loader import load_labeled
-from aquaalert.schemas import LABELS
+from aquaalert.schemas import LABELS, Label
 
 LABEL2ID = {l: i for i, l in enumerate(LABELS)}
 
 
-def predict_ids(clf: Classifier, texts: list[str]) -> list[int]:
-    return [LABEL2ID[max(s, key=s.__getitem__)] for s in clf.predict_scores(texts)]
+def predict_ids(clf: Classifier, texts: list[str], rules: bool = False) -> list[int]:
+    labels = [Label(max(s, key=s.__getitem__)) for s in clf.predict_scores(texts)]
+    if rules:
+        labels = [apply_rules(t, l)[0] for t, l in zip(texts, labels, strict=True)]
+    return [LABEL2ID[l.value] for l in labels]
 
 
 def compare(classifiers: dict[str, Classifier], test_path: str, label_dataset: str | None,
-            n_boot: int = 1000) -> dict:
+            n_boot: int = 1000, rules: bool = False) -> dict:
     pairs = load_labeled(test_path, label_dataset)
     texts, y_true = [t for t, _ in pairs], [LABEL2ID[l.value] for _, l in pairs]
-    reports = {name: full_report(y_true, predict_ids(clf, texts), n_boot) for name, clf in classifiers.items()}
+    reports = {name: full_report(y_true, predict_ids(clf, texts, rules), n_boot) for name, clf in classifiers.items()}
     print(format_table(reports))
-    return {"n_test": len(texts), "n_bootstrap": n_boot, "models": reports}
+    return {"n_test": len(texts), "n_bootstrap": n_boot, "rules": rules, "models": reports}
 
 
 def main() -> None:

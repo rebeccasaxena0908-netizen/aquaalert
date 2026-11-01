@@ -9,3 +9,5 @@ data/cache/*
 !data/cache/.gitkeep
 models/*
 !models/.gitkeep
+data/docs/*
+!data/docs/.gitkeep

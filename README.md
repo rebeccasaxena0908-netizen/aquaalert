@@ -25,6 +25,8 @@ pytest
 | `aquaalert/extract/` | locations / phones / people counts, offline Kerala gazetteer, cached geocoder |
 | `aquaalert/summarize/` | district-wise daily brief (`brief.py`), providers: offline template, Anthropic, OpenAI-compatible (`providers.py`); cited sources, disk cache |
 | `aquaalert/match/` | needs-vs-offers matching: sentence-embedding cosine + haversine proximity (`matcher.py`, `geo.py`) |
+| `aquaalert/classify/rules.py` | post-classification distress rules (promote clear first-person distress to `rescue_needed`) |
+| `aquaalert/chatbot/` | RAG over guideline PDFs in `data/docs/` + latest daily briefs: FAISS, multilingual MiniLM embeddings, cited answers |
 | `aquaalert/pipeline.py` | ingest -> classify -> extract |
 | `dashboard/` | Streamlit + Folium app |
 
@@ -40,10 +42,11 @@ otherwise the zero-shot keyword fallback.
 
 ## Daily briefs
 Without a key the dashboard's **Daily brief** tab writes offline extractive summaries. For LLM summaries add one key to `.env`:
+- `GEMINI_API_KEY` (default model `gemini-3.5-flash-lite`, via Gemini's OpenAI-compatible endpoint; `AQUAALERT_LLM_MODEL=gemini-3.8-flash` for the newest Flash, which was timing out when tested), or
 - `ANTHROPIC_API_KEY` (default model `claude-haiku-5-5`), or
 - `OPENAI_API_KEY` (optional `OPENAI_BASE_URL` for compatible endpoints; default model `gpt-4o-mini`).
 
-`AQUAALERT_LLM_PROVIDER=auto` picks Anthropic, then OpenAI, then the template; `AQUAALERT_LLM_MODEL` overrides the model.
+`AQUAALERT_LLM_PROVIDER=auto` picks Gemini, then Anthropic, then OpenAI, then the template; `AQUAALERT_LLM_MODEL` overrides the model.
 Responses are cached in `data/cache/summaries.json`, citations to posts not in the input are stripped, and phone numbers are
 redacted from the text sent to the API. LLM calls only happen when you click **Generate briefs**. Posts only get a source
 link if the dataset has a `url` column (the synthetic sample has none).
@@ -51,6 +54,37 @@ link if the dataset has a `url` column (the synthetic sample has none).
 ## Needs ↔ Offers
 `rescue_needed`/`need_supplies` posts are matched to nearby `offer_help` posts: `score = alpha * cosine + (1 - alpha) * (1 - km / max_km)`.
 Matching inherits classifier mistakes (e.g. a "need rescue" post labelled as an offer will be treated as an offer).
+
+## Distress rules
+`classify/rules.py` runs after the classifier and promotes `offer_help` / `info_update` to `rescue_needed` when a post
+has an explicit request ("need rescue", "boats needed", "bachao") or a situation cue (trapped, stuck, rooftop, water
+entering, "chhat par") together with first-person wording. Offers, fundraising/volunteer appeals, thanks and past-tense
+accounts are left alone. When a rule fires the Post records `rule` and the model's own `model_label`; the dashboard
+shows both. Turn it off with `AQUAALERT_RULES=off`.
+
+Effect: on the 50 sample posts 3 labels change (s020, s021, s045; all to the correct `rescue_needed`; accuracy vs the
+sample's labels 0.70 → 0.76 with MuRIL). On the HumAID test split it fires on 20 of 15,160 tweets (MuRIL):
+macro-F1 (all 7) 0.727 → 0.716, macro-F1 (5 large classes) 0.759 → 0.759. The drop is all in `rescue_needed`
+(22 gold tweets, defined by a regex over one HumAID class), so HumAID can't really measure this rule; the numbers in
+**Results** above are without it.
+
+## Chatbot
+The **Chatbot** tab answers flood-preparedness questions from the PDFs in `data/docs/` plus the latest district briefs,
+citing the file and page. It uses the same LLM provider as the briefs (Gemini / Anthropic / OpenAI); with no key it shows
+the most relevant passages instead. Passages and the question are treated as untrusted text in the prompt, citations to
+passages that weren't retrieved are stripped, and answers are cached in `data/cache/chat.json`. The FAISS index is
+cached in `data/cache/chatbot/` and rebuilt automatically when files in `data/docs/` change.
+
+Put these in `data/docs/` (git-ignored); both links were checked on 2026-11-01:
+- NDMA *National Disaster Management Guidelines: Management of Floods* (2008), 166 pages, a copy hosted by Goa SDMA:
+  https://sdma.goa.gov.in/sites/default/files/2022-05/flood.pdf
+- A one-page citizen do's and don'ts sheet (before / during / after a flood), from Manipur SDMA:
+  https://msdma.mn.gov.in/uploads/site1/docs/Floods.pdf
+
+The NDMA guidelines are written for governments, so household questions are best served by do's-and-don'ts sheets like the
+second one. Add more by dropping PDFs/`.txt`/`.md` files into `data/docs/`.
+
+CLI: `python -m aquaalert.chatbot.ask "What should be in an emergency kit?"`
 
 ## Geocoding
 Offline gazetteer first, then (if `AQUAALERT_GEOCODE_ONLINE=true`) Nominatim bounded to Kerala. Results are

@@ -6,7 +6,7 @@
 | CrisisLex / CrisisMMD | extra labeled tweets | https://crisisnlp.qcri.org/ — direct download |
 | TREC-IS / CrisisFACTS | information-type labels, summarization refs | http://dcs.gla.ac.uk/~richardm/TREC_IS/ — registration/request may be required |
 | Kaggle Kerala floods tweets | unlabeled replay text | Kaggle account + API token required (manual) |
-| NDMA flood guidelines (PDF) | chatbot KB (Phase 4) | https://ndma.gov.in — manual download to `data/docs/` |
+| NDMA flood guidelines (PDF) | chatbot knowledge base | see README → Chatbot (checked links); manual download to `data/docs/` |
 | IMD rainfall / CWC river levels | sensor fusion (Phase 4) | Manual download to `data/sensors/` |
 
 ## HumAID

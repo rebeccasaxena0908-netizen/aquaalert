@@ -30,6 +30,8 @@ def posts_to_frame(posts: list[Post]) -> pd.DataFrame:
                 "time": p.timestamp,
                 "label": p.label.value if p.label else None,
                 "confidence": round(p.label_score, 2) if p.label_score is not None else None,
+                "rule": p.rule,
+                "model_label": p.model_label.value if p.model_label else None,
                 "location": ex.geo_source if ex else None,
                 "lat": ex.geo.lat if ex and ex.geo else None,
                 "lon": ex.geo.lon if ex and ex.geo else None,
@@ -56,6 +58,8 @@ def build_map(posts: list[Post]) -> folium.Map:
             continue
         dlat, dlon = jitter(p.id)
         popup = f"<b>{p.label.value}</b> ({p.label_score:.0%})<br>{p.text}"
+        if p.rule:
+            popup += f"<br><i>rule: {p.rule} (model said {p.model_label.value})</i>"
         if p.extraction.phones:
             popup += f"<br>Phone: {', '.join(p.extraction.phones)}"
         folium.CircleMarker(

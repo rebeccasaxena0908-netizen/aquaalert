@@ -5,6 +5,7 @@ from pathlib import Path
 
 from aquaalert.classify.base import Classifier, classify_posts
 from aquaalert.classify.model import get_classifier
+from aquaalert.config import get_settings
 from aquaalert.extract.entities import extract_posts
 from aquaalert.extract.geocode import Geocoder
 from aquaalert.ingest.loader import load_posts
@@ -14,7 +15,8 @@ from aquaalert.schemas import Post
 def process_posts(
     posts: list[Post], classifier: Classifier | None = None, geocoder: Geocoder | None = None
 ) -> list[Post]:
-    return extract_posts(classify_posts(posts, classifier or get_classifier()), geocoder)
+    classified = classify_posts(posts, classifier or get_classifier(), rules=get_settings().rules)
+    return extract_posts(classified, geocoder)
 
 
 def run(path: str | Path, limit: int | None = None) -> list[Post]:

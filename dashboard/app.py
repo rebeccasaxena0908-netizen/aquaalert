@@ -15,8 +15,9 @@ from aquaalert.extract.geocode import Geocoder  # noqa: E402
 from aquaalert.ingest.loader import load_posts  # noqa: E402
 from aquaalert.pipeline import process_posts  # noqa: E402
 from aquaalert.match.matcher import default_encoder, match_posts  # noqa: E402
+from aquaalert.chatbot.rag import brief_passages, default_chatbot  # noqa: E402
 from aquaalert.summarize.brief import daily_briefs  # noqa: E402
-from aquaalert.summarize.providers import get_provider  # noqa: E402
+from aquaalert.summarize.providers import TemplateProvider, get_provider  # noqa: E402
 from dashboard.helpers import LABEL_COLORS, build_map, build_match_map, posts_to_frame  # noqa: E402
 
 st.set_page_config(page_title="AquaAlert", page_icon="🌊", layout="wide")
@@ -30,6 +31,11 @@ def _classifier():
 @st.cache_resource
 def _encoder():
     return default_encoder()
+
+
+@st.cache_resource(show_spinner="Loading guideline index...")
+def _chatbot():
+    return default_chatbot()
 
 
 @st.cache_data(show_spinner="Classifying and geocoding posts...")
@@ -72,7 +78,7 @@ c3.metric("Rescue requests", int((df["label"] == "rescue_needed").sum()) if len(
 
 # Briefs and matching look at everything up to the replay clock, regardless of the category filter.
 so_far = [p for p in posts if p.timestamp <= replay_at]
-tab_map, tab_brief, tab_match = st.tabs(["Map", "Daily brief", "Needs ↔ Offers"])
+tab_map, tab_brief, tab_match, tab_chat = st.tabs(["Map", "Daily brief", "Needs ↔ Offers", "Chatbot"])
 
 with tab_map:
     map_col, legend_col = st.columns([4, 1])
@@ -96,7 +102,7 @@ with tab_brief:
         st.stop()
     days = sorted({p.timestamp.date() for p in so_far})
     st.caption(f"Provider: `{provider.name}` / `{provider.model}`"
-               + ("" if provider.uses_network else " — offline summaries (add ANTHROPIC_API_KEY or OPENAI_API_KEY to .env for LLM summaries)"))
+               + ("" if provider.uses_network else " — offline summaries (add GEMINI_API_KEY, ANTHROPIC_API_KEY or OPENAI_API_KEY to .env for LLM summaries)"))
     if not days:
         st.info("No posts yet at this replay time.")
     else:
@@ -113,6 +119,8 @@ with tab_brief:
                     st.write(b.summary)
                     st.caption(", ".join(f"{k.replace('_', ' ')}: {v}" for k, v in b.counts.items())
                                + (" · cached" if b.cached else ""))
+                    if b.fallback_reason:
+                        st.warning(f"LLM unavailable ({b.fallback_reason}); showing the offline summary.")
                     if b.dropped_citations:
                         st.warning(f"Removed citations to unknown posts: {', '.join(b.dropped_citations)}")
                     st.markdown("**Sources**")
@@ -137,3 +145,35 @@ with tab_match:
             width="stretch", hide_index=True)
     else:
         st.info("No need/offer pairs within the current limits.")
+
+
+with tab_chat:
+    st.caption("Ask about flood preparedness and safety. Answers cite NDMA guideline pages and the latest district briefs. "
+               "In immediate danger call **112** first.")
+    try:
+        bot = _chatbot()
+    except ValueError as exc:  # e.g. provider forced to anthropic without a key
+        st.error(str(exc))
+        st.stop()
+    if not bot.kb.has_guidelines:
+        st.warning("No guideline documents found. Put NDMA flood PDFs in `data/docs/` and reload (see README). "
+                   "Until then answers can only draw on the daily briefs.")
+    # Briefs for the latest day so far, from the free offline summarizer (the chatbot never triggers paid LLM calls for them).
+    latest = max((p.timestamp.date() for p in so_far), default=None)
+    bot.kb.set_briefs(brief_passages(daily_briefs(so_far, TemplateProvider(), day=latest)) if latest else [])
+    st.caption(f"Provider: `{bot.provider.name}`" + ("" if bot.provider.uses_network else " — offline: shows the most relevant passages (add an API key to .env for written answers)"))
+
+    history = st.session_state.setdefault("chat", [])
+    for msg in history:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["text"])
+            if msg.get("citations"):
+                with st.expander("Sources"):
+                    for c in msg["citations"]:
+                        where = f"{c['source']}, p. {c['page']}" if c["page"] else c["source"]
+                        st.markdown(f"**[{c['n']}] {where}**" + (f" ({c['ref']})" if c.get("ref") else "") + f"  \n{c['excerpt']}")
+    if question := st.chat_input("Ask a question (English, Hindi, ...)"):
+        history.append({"role": "user", "text": question})
+        ans = bot.ask(question)
+        history.append({"role": "assistant", "text": ans.text, "citations": [c.model_dump() for c in ans.citations]})
+        st.rerun()

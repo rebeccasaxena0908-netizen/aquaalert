@@ -52,6 +52,8 @@ class Post(BaseModel):
     label: Label | None = None
     label_score: float | None = Field(default=None, ge=0, le=1)
     label_scores: dict[str, float] | None = None
+    model_label: Label | None = None  # the classifier's own label when a rule overrode it
+    rule: str | None = None  # name of the post-classification rule that fired, if any
 
     # credibility/ (Phase 2)
     credibility: float | None = Field(default=None, ge=0, le=1)

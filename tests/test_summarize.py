@@ -9,8 +9,8 @@ from aquaalert.extract.geocode import Geocoder
 from aquaalert.ingest.loader import load_posts
 from aquaalert.summarize import brief as brief_mod
 from aquaalert.summarize.brief import build_inputs, daily_briefs
-from aquaalert.summarize.providers import (AnthropicProvider, OpenAIProvider, TemplateProvider,
-                                           build_user_prompt, get_provider)
+from aquaalert.summarize.providers import (AnthropicProvider, GeminiProvider, OpenAIProvider, TemplateProvider,
+                                           build_user_prompt, get_provider, post_json)
 
 
 @pytest.fixture
@@ -98,17 +98,100 @@ def test_openai_provider_payload():
     assert headers["Authorization"] == "Bearer k" and payload["messages"][0]["role"] == "system"
 
 
+def test_gemini_provider_request_shape():
+    http = FakeHTTP("Water is rising [s1].")
+    inp = brief_mod.BriefInput("Idukki", "2018-08-15", {"info_update": 1},
+                               [brief_mod.BriefPost("s1", "info_update", "Dam open")])
+    provider = GeminiProvider("gem-secret", http=http.openai)
+    assert provider.name == "gemini" and provider.model == "gemini-3.5-flash-lite" and provider.uses_network
+    assert provider.summarize(inp) == "Water is rising [s1]."
+    url, headers, payload = http.calls[0]
+    assert url == "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+    assert headers == {"Authorization": "Bearer gem-secret"}
+    assert payload["model"] == "gemini-3.5-flash-lite" and payload["messages"][0]["role"] == "system"
+    assert payload["reasoning_effort"] == "low"
+    assert GeminiProvider("k", "gemini-3.6-flash", http=http.openai).model == "gemini-3.6-flash"
+
+
+def test_gemini_brief_is_cached_and_cited(posts, tmp_path):
+    first_id = next(iter(build_inputs(posts).values()))[0].posts[0].id
+    http = FakeHTTP(f"Boats needed [{first_id}].")
+    provider = GeminiProvider("k", http=http.openai)
+    b1 = daily_briefs(posts, provider, tmp_path / "c.json")[0]
+    n = len(http.calls)
+    b2 = daily_briefs(posts, provider, tmp_path / "c.json")[0]
+    assert len(http.calls) == n and b2.cached and b1.provider == "gemini"
+
+
 def test_get_provider_selection(monkeypatch):
     monkeypatch.setenv("AQUAALERT_LLM_PROVIDER", "auto")
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("AQUAALERT_LLM_MODEL", "")
+    for k in ("GEMINI_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
+        monkeypatch.delenv(k, raising=False)
     assert isinstance(get_provider(), TemplateProvider)
     monkeypatch.setenv("OPENAI_API_KEY", "x")
-    assert isinstance(get_provider(), OpenAIProvider)
+    assert type(get_provider()) is OpenAIProvider
     monkeypatch.setenv("ANTHROPIC_API_KEY", "y")
-    assert isinstance(get_provider(), AnthropicProvider)  # Anthropic wins in auto
+    assert isinstance(get_provider(), AnthropicProvider)  # Anthropic beats OpenAI
+    monkeypatch.setenv("GEMINI_API_KEY", "z")
+    assert isinstance(get_provider(), GeminiProvider)  # Gemini wins in auto
+    assert isinstance(get_provider("anthropic"), AnthropicProvider)  # explicit choice still honoured
+    monkeypatch.delenv("GEMINI_API_KEY")
+    with pytest.raises(ValueError, match="GEMINI_API_KEY"):
+        get_provider("gemini")
     monkeypatch.delenv("ANTHROPIC_API_KEY")
     with pytest.raises(ValueError, match="ANTHROPIC_API_KEY"):
         get_provider("anthropic")
     with pytest.raises(ValueError):
         get_provider("bogus")
+
+
+def test_model_override_applies_to_selected_provider(monkeypatch):
+    monkeypatch.setenv("AQUAALERT_LLM_PROVIDER", "gemini")
+    monkeypatch.setenv("AQUAALERT_LLM_MODEL", "gemini-3.6-flash")
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    assert get_provider().model == "gemini-3.6-flash"
+
+
+def test_http_errors_do_not_leak_the_key(monkeypatch):
+    import io
+    import urllib.error
+
+    def boom(req, timeout):
+        raise urllib.error.HTTPError(req.full_url, 401, "Unauthorized", {}, io.BytesIO(b"bad key sk-secret-123"))
+
+    monkeypatch.setattr("urllib.request.urlopen", boom)
+    with pytest.raises(RuntimeError) as err:
+        post_json("https://example.org/x", {"Authorization": "Bearer sk-secret-123"}, {})
+    assert "401" in str(err.value) and "sk-secret-123" not in str(err.value) and err.value.__cause__ is None
+
+
+def test_empty_llm_reply_is_an_error_not_a_blank_summary():
+    def empty(url, headers, payload):  # what Gemini returns when hidden reasoning used up max_tokens
+        return {"choices": [{"finish_reason": "length", "index": 0, "message": {"role": "assistant"}}]}
+
+    with pytest.raises(RuntimeError, match="no text .*length"):
+        GeminiProvider("k", http=empty).complete("sys", "user")
+
+
+def test_timeout_becomes_readable_error(monkeypatch):
+    def slow(req, timeout):
+        raise TimeoutError("The read operation timed out")
+
+    monkeypatch.setattr("urllib.request.urlopen", slow)
+    with pytest.raises(RuntimeError, match="timed out"):
+        post_json("https://example.org/x", {}, {})
+
+
+def test_failed_llm_falls_back_to_offline_briefs_without_caching(posts, tmp_path):
+    calls = []
+
+    def down(url, headers, payload):
+        calls.append(1)
+        raise RuntimeError("LLM request failed: HTTP 503")
+
+    cache = tmp_path / "c.json"
+    briefs = daily_briefs(posts, GeminiProvider("k", http=down), cache)
+    assert len(calls) == 1  # stopped hammering the API after the first failure
+    assert len(briefs) > 3 and all(b.provider == "template" and b.fallback_reason == "LLM request failed: HTTP 503" for b in briefs)
+    assert all(b.summary for b in briefs) and not cache.exists()

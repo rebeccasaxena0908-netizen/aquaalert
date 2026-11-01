@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.error
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -10,7 +11,10 @@ from typing import Protocol
 
 from aquaalert.config import get_settings
 
-DEFAULT_MODELS = {"anthropic": "claude-haiku-5-5", "openai": "gpt-4o-mini"}
+# gemini: gemini-3.8-flash is the newest stable Flash (https://ai.google.dev/gemini-api/docs/models), but it
+# timed out in live tests (Nov 2026) while 3.5-flash-lite answered in ~1-5s; set AQUAALERT_LLM_MODEL to switch.
+DEFAULT_MODELS = {"anthropic": "claude-haiku-5-5", "openai": "gpt-4o-mini", "gemini": "gemini-3.5-flash-lite"}
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"  # OpenAI-compatible endpoint
 
 SYSTEM_PROMPT = (
     "You write short daily flood-response briefs for emergency coordinators. "
@@ -91,8 +95,16 @@ PostJson = Callable[[str, dict, dict], dict]
 
 def post_json(url: str, headers: dict, payload: dict) -> dict:
     req = urllib.request.Request(url, json.dumps(payload).encode(), {"Content-Type": "application/json", **headers})
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        return json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        # report only the status: never echo request details (they carry the API key)
+        raise RuntimeError(f"LLM request failed: HTTP {exc.code}") from None
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"LLM request failed: {exc.reason}") from None
+    except TimeoutError:
+        raise RuntimeError("LLM request timed out after 60s") from None
 
 
 class AnthropicProvider:
@@ -101,44 +113,71 @@ class AnthropicProvider:
     def __init__(self, api_key: str, model: str | None = None, http: PostJson = post_json) -> None:
         self.model, self._key, self._http = model or DEFAULT_MODELS["anthropic"], api_key, http
 
-    def summarize(self, brief: BriefInput) -> str:
+    def complete(self, system: str, user: str, max_tokens: int = 600) -> str:
         data = self._http(
             "https://api.anthropic.com/v1/messages",
             {"x-api-key": self._key, "anthropic-version": "2023-06-01"},
-            {"model": self.model, "max_tokens": 600, "system": SYSTEM_PROMPT,
-             "messages": [{"role": "user", "content": build_user_prompt(brief)}]},
+            {"model": self.model, "max_tokens": max_tokens, "system": system,
+             "messages": [{"role": "user", "content": user}]},
         )
         return "".join(b.get("text", "") for b in data["content"] if b.get("type") == "text").strip()
+
+    def summarize(self, brief: BriefInput) -> str:
+        return self.complete(SYSTEM_PROMPT, build_user_prompt(brief))
 
 
 class OpenAIProvider:
     name, uses_network = "openai", True
+    extra_payload: dict = {}  # provider-specific request fields (Gemini sets reasoning_effort)
 
     def __init__(self, api_key: str, model: str | None = None, base_url: str | None = None,
                  http: PostJson = post_json) -> None:
         self.model, self._key, self._http = model or DEFAULT_MODELS["openai"], api_key, http
         self._base = (base_url or "https://api.openai.com/v1").rstrip("/")
 
-    def summarize(self, brief: BriefInput) -> str:
+    def complete(self, system: str, user: str, max_tokens: int = 600) -> str:
         data = self._http(
             f"{self._base}/chat/completions",
             {"Authorization": f"Bearer {self._key}"},
-            {"model": self.model, "max_tokens": 600, "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": build_user_prompt(brief)}]},
+            {"model": self.model, "max_tokens": max_tokens, **self.extra_payload, "messages": [
+                {"role": "system", "content": system}, {"role": "user", "content": user}]},
         )
-        return data["choices"][0]["message"]["content"].strip()
+        choice = data["choices"][0]
+        text = (choice["message"].get("content") or "").strip()
+        if not text:  # e.g. hidden reasoning tokens used up max_tokens: never return/cache a blank answer
+            raise RuntimeError(f"LLM returned no text (finish_reason={choice.get('finish_reason')})")
+        return text
+
+    def summarize(self, brief: BriefInput) -> str:
+        return self.complete(SYSTEM_PROMPT, build_user_prompt(brief))
+
+
+class GeminiProvider(OpenAIProvider):
+    """Google Gemini through its OpenAI-compatible endpoint (same request shape as OpenAIProvider)."""
+
+    name = "gemini"
+    # Gemini 3 models think by default; "low" keeps hidden reasoning from eating the output token budget.
+    extra_payload = {"reasoning_effort": "low"}
+
+    def __init__(self, api_key: str, model: str | None = None, http: PostJson = post_json) -> None:
+        super().__init__(api_key, model or DEFAULT_MODELS["gemini"], GEMINI_BASE_URL, http)
 
 
 def get_provider(name: str | None = None) -> Provider:
-    """``auto``: Anthropic if ANTHROPIC_API_KEY, else OpenAI if OPENAI_API_KEY, else the offline template."""
+    """``auto``: Gemini if GEMINI_API_KEY, else Anthropic, else OpenAI, else the offline template."""
     settings = get_settings()
     name = name or settings.llm_provider
+    gemini_key = os.getenv("GEMINI_API_KEY")
     anthropic_key, openai_key = os.getenv("ANTHROPIC_API_KEY"), os.getenv("OPENAI_API_KEY")
     if name == "auto":
-        name = "anthropic" if anthropic_key else "openai" if openai_key else "template"
+        name = ("gemini" if gemini_key else "anthropic" if anthropic_key
+                else "openai" if openai_key else "template")
     if name == "template":
         return TemplateProvider()
+    if name == "gemini":
+        if not gemini_key:
+            raise ValueError("GEMINI_API_KEY is not set (add it to .env)")
+        return GeminiProvider(gemini_key, settings.llm_model)
     if name == "anthropic":
         if not anthropic_key:
             raise ValueError("ANTHROPIC_API_KEY is not set (add it to .env)")

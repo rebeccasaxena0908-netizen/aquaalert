@@ -29,6 +29,7 @@ class Settings:
     geocode_online: bool
     dataset: Path
     cache_dir: Path
+    rules: bool
     llm_provider: str
     llm_model: str | None
 
@@ -43,6 +44,7 @@ def get_settings() -> Settings:
         geocode_online=os.getenv("AQUAALERT_GEOCODE_ONLINE", "false").lower() == "true",
         dataset=_path(os.getenv("AQUAALERT_DATASET", "data/sample_posts.csv")),
         cache_dir=_path("data/cache"),
+        rules=(os.getenv("AQUAALERT_RULES") or "on").lower() not in ("off", "false", "0"),
         llm_provider=os.getenv("AQUAALERT_LLM_PROVIDER") or "auto",
         llm_model=os.getenv("AQUAALERT_LLM_MODEL") or None,
     )
