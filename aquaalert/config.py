@@ -14,9 +14,16 @@ load_dotenv(ROOT / ".env")
 KERALA_BBOX = (8.17, 74.85, 12.80, 77.42)
 
 
+DEFAULT_DATASET = "data/sample_posts.csv,data/sample_posts_multilingual.csv,data/sample_posts_rumours.csv"
+
+
 def _path(value: str) -> Path:
     p = Path(value)
     return p if p.is_absolute() else ROOT / p
+
+
+def dataset_paths(value: str) -> list[Path]:
+    return [_path(v.strip()) for v in value.split(",") if v.strip()]
 
 
 @dataclass(frozen=True)
@@ -27,7 +34,7 @@ class Settings:
     base_model: str
     geocoder_user_agent: str
     geocode_online: bool
-    dataset: Path
+    dataset: str  # one path or several, comma-separated (relative to the repo root)
     cache_dir: Path
     rules: bool
     llm_provider: str
@@ -42,7 +49,7 @@ def get_settings() -> Settings:
         base_model=os.getenv("AQUAALERT_BASE_MODEL", "google/muril-base-cased"),
         geocoder_user_agent=os.getenv("AQUAALERT_GEOCODER_USER_AGENT", "aquaalert-dev"),
         geocode_online=os.getenv("AQUAALERT_GEOCODE_ONLINE", "false").lower() == "true",
-        dataset=_path(os.getenv("AQUAALERT_DATASET", "data/sample_posts.csv")),
+        dataset=os.getenv("AQUAALERT_DATASET") or DEFAULT_DATASET,
         cache_dir=_path("data/cache"),
         rules=(os.getenv("AQUAALERT_RULES") or "on").lower() not in ("off", "false", "0"),
         llm_provider=os.getenv("AQUAALERT_LLM_PROVIDER") or "auto",

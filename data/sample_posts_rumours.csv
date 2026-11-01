@@ -1,0 +1,17 @@
+id,text,timestamp,source,author,label,lang,misinfo
+r001,BREAKING: Mullaperiyar dam has broken!! Water will reach Kochi in 2 hours. Forward to all groups!!!,2018-08-16 01:10:00,sample-rumours,rumour_a,info_update,en,1
+r002,"Mullaperiyar dam is safe, there is no breach. Water level 140 ft. - District Collector, Idukki",2018-08-16 02:00:00,sample-rumours,collector_idk,info_update,en,0
+r003,"URGENT!! 50 people trapped in Ranni school, send boats. Share maximum!!",2018-08-15 09:00:00,sample-rumours,fwd_1,rescue_needed,en,1
+r004,"URGENT!! 50 people trapped in Ranni school, send boats. Share maximum!!",2018-08-15 11:30:00,sample-rumours,fwd_2,rescue_needed,en,1
+r005,"URGENT!! 50 people trapped in Ranni school, send boats. Share maximum!!",2018-08-16 08:00:00,sample-rumours,fwd_3,rescue_needed,en,1
+r006,"500 people dead in Chengannur, government is hiding the real numbers. Share before it is deleted!",2018-08-15 20:00:00,sample-rumours,rumour_b,info_update,en,1
+r007,"This photo is from the 2015 Chennai floods, not Aluva. Please don't forward it.",2018-08-15 21:00:00,sample-rumours,factcheck_1,info_update,en,0
+r008,The viral video of the 2013 Kedarnath flood being shared as Kerala today is fake. Check before sharing.,2018-08-15 21:30:00,sample-rumours,factcheck_2,info_update,en,0
+r009,"Shocking video: entire Thrissur town under water, 1000 died. Forward to everyone!!",2018-08-15 19:30:00,sample-rumours,rumour_c,info_update,en,1
+r010,"Water has receded in Chengannur, everyone is safe now, no more rescue needed.",2018-08-15 09:30:00,sample-rumours,rumour_d,info_update,en,1
+r011,"As per IMD bulletin, red alert in Idukki and Wayanad for the next 24 hours.",2018-08-15 18:00:00,sample-rumours,news_desk,info_update,en,0
+r012,"Army has stopped all rescue operations in Kuttanad from tonight, forward to all",2018-08-15 22:00:00,sample-rumours,rumour_e,info_update,en,1
+r013,മുല്ലപ്പെരിയാർ ഡാം പൊട്ടി! എല്ലാവർക്കും ഫോർവേഡ് ചെയ്യുക,2018-08-16 01:30:00,sample-rumours,rumour_f,info_update,ml,1
+r014,"Sabko forward karo: Idukki dam toot gaya hai, turant ghar khali karo",2018-08-16 01:45:00,sample-rumours,rumour_g,info_update,hi-Latn,1
+r015,"Need rescue for 6 people near Pandalam bridge, elderly woman with us. 9447001234",2018-08-15 14:15:00,sample-rumours,family_p,rescue_needed,en,0
+r016,"Relief camp at Thiruvalla school needs rice and blankets, per the village officer.",2018-08-15 16:40:00,sample-rumours,volunteer_t,need_supplies,en,0

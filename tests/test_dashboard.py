@@ -85,3 +85,24 @@ def test_brief_tab_waits_for_click_when_an_llm_is_configured(monkeypatch):
     at = AppTest.from_file(str(APP), default_timeout=120).run()
     assert not at.exception and len(at.expander) == 0  # nothing generated, no network call made
     assert any("Generate briefs" in b.label for b in at.button)
+
+
+def test_low_credibility_filter_hides_flagged_posts(monkeypatch):
+    for k in ("GEMINI_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
+        monkeypatch.setenv(k, "")
+    at = AppTest.from_file(str(APP), default_timeout=120).run()
+    before = int({m.label: m.value for m in at.metric}["Posts shown"])
+    flagged = int({m.label: m.value for m in at.metric}["Flagged as doubtful"])
+    assert flagged > 0
+    at.sidebar.checkbox[0].check().run()
+    after = int({m.label: m.value for m in at.metric}["Posts shown"])
+    assert not at.exception and after < before
+
+
+def test_frame_has_language_and_misinfo_columns(sample_path, tmp_path):
+    from aquaalert.credibility.heuristics import score_posts
+    from aquaalert.language.detect import detect_posts
+
+    posts = score_posts(detect_posts(_processed(sample_path, tmp_path)))
+    df = posts_to_frame(posts)
+    assert {"language", "misinfo", "misinfo_reasons"} <= set(df.columns) and set(df["language"]) >= {"en", "hi-Latn"}

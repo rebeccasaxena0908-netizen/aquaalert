@@ -72,10 +72,19 @@ def load_posts(
                 source=source or str(row.get("source") or path.stem),
                 author=(str(row["author"]) or None) if "author" in cols else None,
                 url=(str(row[url_col]).strip() or None) if url_col else None,
+                gold_language=(str(row["lang"]).strip() or None) if "lang" in cols else None,
                 gold_label=map_label(str(row[label_col]), label_dataset, text) if label_col else None,
             )
         )
     posts.sort(key=lambda p: p.timestamp)
+    return posts[:limit] if limit else posts
+
+
+def load_many(paths: str | Path | list, limit: int | None = None, **kwargs) -> list[Post]:
+    """Load several dataset files (a list, or a comma-separated string) into one time-ordered list."""
+    if isinstance(paths, (str, Path)):
+        paths = [p.strip() for p in str(paths).split(",") if p.strip()]
+    posts = sorted((p for path in paths for p in load_posts(path, **kwargs)), key=lambda p: p.timestamp)
     return posts[:limit] if limit else posts
 
 

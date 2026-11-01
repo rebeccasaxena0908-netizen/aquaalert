@@ -1,4 +1,4 @@
-"""Phase 1 pipeline: ingest -> classify -> extract(geo)."""
+"""Pipeline: ingest -> language -> classify (+ distress rules) -> extract(geo) -> credibility."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,19 +8,26 @@ from aquaalert.classify.model import get_classifier
 from aquaalert.config import get_settings
 from aquaalert.extract.entities import extract_posts
 from aquaalert.extract.geocode import Geocoder
-from aquaalert.ingest.loader import load_posts
+from aquaalert.ingest.loader import load_many, load_posts  # noqa: F401
+from aquaalert.language.detect import detect_posts
+from aquaalert.credibility.heuristics import score_posts
 from aquaalert.schemas import Post
 
 
 def process_posts(
     posts: list[Post], classifier: Classifier | None = None, geocoder: Geocoder | None = None
 ) -> list[Post]:
-    classified = classify_posts(posts, classifier or get_classifier(), rules=get_settings().rules)
-    return extract_posts(classified, geocoder)
+    from aquaalert.summarize.brief import daily_briefs  # local: summarize imports this module's callers
+    from aquaalert.summarize.providers import TemplateProvider
+
+    classified = classify_posts(detect_posts(posts), classifier or get_classifier(), rules=get_settings().rules)
+    located = extract_posts(classified, geocoder)
+    # credibility needs locations (nearby contradictions) and the offline district briefs (no LLM calls here)
+    return score_posts(located, daily_briefs(located, TemplateProvider()))
 
 
 def run(path: str | Path, limit: int | None = None) -> list[Post]:
-    return process_posts(load_posts(path, limit=limit))
+    return process_posts(load_many(path, limit=limit))
 
 
 if __name__ == "__main__":

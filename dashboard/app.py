@@ -12,13 +12,13 @@ from streamlit_folium import st_folium  # noqa: E402
 from aquaalert.classify.model import get_classifier  # noqa: E402
 from aquaalert.config import get_settings  # noqa: E402
 from aquaalert.extract.geocode import Geocoder  # noqa: E402
-from aquaalert.ingest.loader import load_posts  # noqa: E402
+from aquaalert.ingest.loader import load_many  # noqa: E402
 from aquaalert.pipeline import process_posts  # noqa: E402
 from aquaalert.match.matcher import default_encoder, match_posts  # noqa: E402
 from aquaalert.chatbot.rag import AUDIENCE_LABEL, brief_passages, default_chatbot  # noqa: E402
-from aquaalert.summarize.brief import daily_briefs  # noqa: E402
+from aquaalert.summarize.brief import daily_briefs, latest_per_district  # noqa: E402
 from aquaalert.summarize.providers import TemplateProvider, get_provider  # noqa: E402
-from dashboard.helpers import LABEL_COLORS, build_map, build_match_map, posts_to_frame  # noqa: E402
+from dashboard.helpers import FLAG_THRESHOLD, LABEL_COLORS, build_map, build_match_map, posts_to_frame  # noqa: E402
 
 st.set_page_config(page_title="AquaAlert", page_icon="🌊", layout="wide")
 
@@ -40,12 +40,12 @@ def _chatbot():
 
 @st.cache_data(show_spinner="Classifying and geocoding posts...")
 def _processed(path: str):
-    return process_posts(load_posts(path), _classifier(), Geocoder())
+    return process_posts(load_many(path), _classifier(), Geocoder())
 
 
 st.title("🌊 AquaAlert — flood crisis map")
 settings = get_settings()
-path = st.sidebar.text_input("Dataset (CSV/JSON/JSONL)", str(settings.dataset))
+path = st.sidebar.text_input("Dataset(s) (CSV/JSON/JSONL, comma-separated)", settings.dataset)
 try:
     posts = _processed(path)
 except (FileNotFoundError, ValueError) as exc:
@@ -58,6 +58,16 @@ if not posts:
 st.sidebar.caption(f"Classifier: `{_classifier().name}`")
 labels = st.sidebar.multiselect("Categories", list(LABEL_COLORS), default=[l for l in LABEL_COLORS if l != "irrelevant"])
 min_conf = st.sidebar.slider("Min confidence", 0.0, 1.0, 0.0, 0.05)
+languages = sorted({p.language or "und" for p in posts})
+lang_pick = st.sidebar.multiselect("Languages", languages, default=languages)
+hide_doubtful = st.sidebar.checkbox("Hide low-credibility posts", value=False,
+                                    help="Heuristic misinformation score, not a trained model (see README)")
+max_misinfo = st.sidebar.slider("…with misinformation score at or above", 0.1, 1.0, FLAG_THRESHOLD, 0.05,
+                                disabled=not hide_doubtful)
+
+
+def credible(p) -> bool:
+    return not hide_doubtful or (p.misinfo_score or 0) < max_misinfo
 
 # Replay: reveal posts up to a simulated clock, like a live feed.
 times = [p.timestamp for p in posts]
@@ -67,17 +77,21 @@ replay_at = st.sidebar.slider(
 visible = [
     p for p in posts
     if p.timestamp <= replay_at and p.label and p.label.value in labels and (p.label_score or 0) >= min_conf
+    and (p.language or "und") in lang_pick and credible(p)
 ]
 
 df = posts_to_frame(visible)
 mapped = int(df["lat"].notna().sum()) if len(df) else 0
-c1, c2, c3 = st.columns(3)
+c1, c2, c3, c4 = st.columns(4)
 c1.metric("Posts shown", len(visible))
 c2.metric("On map", mapped)
 c3.metric("Rescue requests", int((df["label"] == "rescue_needed").sum()) if len(df) else 0)
+c4.metric("Flagged as doubtful", sum((p.misinfo_score or 0) >= FLAG_THRESHOLD for p in posts if p.timestamp <= replay_at),
+          help=f"misinformation score >= {FLAG_THRESHOLD}; hidden only when the sidebar filter is on")
 
-# Briefs and matching look at everything up to the replay clock, regardless of the category filter.
-so_far = [p for p in posts if p.timestamp <= replay_at]
+# Briefs, matching and the chatbot use everything up to the replay clock (minus hidden low-credibility posts),
+# regardless of the category and language filters.
+so_far = [p for p in posts if p.timestamp <= replay_at and credible(p)]
 tab_map, tab_brief, tab_match, tab_chat = st.tabs(["Map", "Daily brief", "Needs ↔ Offers", "Chatbot"])
 
 with tab_map:
@@ -118,7 +132,8 @@ with tab_brief:
                 with st.expander(f"{b.district} — {b.counts.get('rescue_needed', 0)} rescue request(s)", expanded=b.counts.get("rescue_needed", 0) > 0):
                     st.write(b.summary)
                     st.caption(", ".join(f"{k.replace('_', ' ')}: {v}" for k, v in b.counts.items())
-                               + (" · cached" if b.cached else ""))
+                               + (" · cached" if b.cached else "")
+                               + (f" · {b.excluded_doubtful} doubtful post(s) left out" if b.excluded_doubtful else ""))
                     if b.fallback_reason:
                         st.warning(f"LLM unavailable ({b.fallback_reason}); showing the offline summary.")
                     if b.dropped_citations:
@@ -159,8 +174,8 @@ with tab_chat:
         st.warning("No guideline documents found. Put NDMA flood PDFs in `data/docs/` and reload (see README). "
                    "Until then answers can only draw on the daily briefs.")
     # Briefs for the latest day so far, from the free offline summarizer (the chatbot never triggers paid LLM calls for them).
-    latest = max((p.timestamp.date() for p in so_far), default=None)
-    bot.kb.set_briefs(brief_passages(daily_briefs(so_far, TemplateProvider(), day=latest)) if latest else [])
+    # each district's most recent brief, from the free offline summarizer (no paid LLM calls for chatbot context)
+    bot.kb.set_briefs(brief_passages(latest_per_district(daily_briefs(so_far, TemplateProvider()))))
     st.caption(f"Provider: `{bot.provider.name}`" + ("" if bot.provider.uses_network else " — offline: shows the most relevant passages (add an API key to .env for written answers)"))
 
     history = st.session_state.setdefault("chat", [])

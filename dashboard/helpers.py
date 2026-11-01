@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import hashlib
+import html
 
 import folium
 import pandas as pd
 
 from aquaalert.config import KERALA_BBOX
 from aquaalert.schemas import Post
+
+FLAG_THRESHOLD = 0.5  # misinfo score at which a marker is drawn as "doubtful"
 
 LABEL_COLORS: dict[str, str] = {
     "rescue_needed": "red",
@@ -30,6 +33,9 @@ def posts_to_frame(posts: list[Post]) -> pd.DataFrame:
                 "time": p.timestamp,
                 "label": p.label.value if p.label else None,
                 "confidence": round(p.label_score, 2) if p.label_score is not None else None,
+                "language": p.language,
+                "misinfo": p.misinfo_score,
+                "misinfo_reasons": "; ".join(p.misinfo_reasons),
                 "rule": p.rule,
                 "model_label": p.model_label.value if p.model_label else None,
                 "location": ex.geo_source if ex else None,
@@ -60,6 +66,10 @@ def build_map(posts: list[Post]) -> folium.Map:
         popup = f"<b>{p.label.value}</b> ({p.label_score:.0%})<br>{p.text}"
         if p.rule:
             popup += f"<br><i>rule: {p.rule} (model said {p.model_label.value})</i>"
+        flagged = (p.misinfo_score or 0) >= FLAG_THRESHOLD
+        if p.misinfo_reasons:
+            popup += (f"<br><b>misinformation score {p.misinfo_score:.2f}</b><ul>"
+                      + "".join(f"<li>{html.escape(r)}</li>" for r in p.misinfo_reasons) + "</ul>")
         if p.extraction.phones:
             popup += f"<br>Phone: {', '.join(p.extraction.phones)}"
         folium.CircleMarker(
@@ -67,7 +77,8 @@ def build_map(posts: list[Post]) -> folium.Map:
             radius=8,
             color=LABEL_COLORS[p.label.value],
             fill=True,
-            fill_opacity=0.8,
+            fill_opacity=0.25 if flagged else 0.8,
+            dash_array="4" if flagged else None,  # flagged posts: hollow, dashed outline
             popup=folium.Popup(popup, max_width=320),
             tooltip=f"{p.label.value} - {p.extraction.geo_source}",
         ).add_to(fmap)

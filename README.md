@@ -3,16 +3,16 @@
 Turns flood-time posts (English, Hindi/Hinglish, Bengali, Malayalam, Assamese) into classified
 help requests on a map. See [CLAUDE.md](CLAUDE.md) for the full architecture and roadmap.
 
-## Status: Phase 1 + Phase 3 quick wins
-`ingest -> classify -> extract(geo) -> summarize / match -> Streamlit`, runnable with no downloads, training or API keys
-(Phase 2, language and credibility, is not built yet).
+## Status: Phases 1-3
+`ingest -> language -> classify (+ distress rules) -> extract(geo) -> credibility -> summarize / match / chatbot -> Streamlit`,
+runnable with no downloads, training or API keys. Phase 4 (sensor fusion, FastAPI) is next.
 
 ## Quick start
 ```bash
 python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt      # torch/transformers only needed for training
 cp .env.example .env
-streamlit run dashboard/app.py       # runs on data/sample_posts.csv (50 fake posts)
+streamlit run dashboard/app.py       # runs on the synthetic samples in data/ (English, multilingual, rumours)
 pytest
 ```
 
@@ -27,6 +27,8 @@ pytest
 | `aquaalert/match/` | needs-vs-offers matching: sentence-embedding cosine + haversine proximity (`matcher.py`, `geo.py`) |
 | `aquaalert/classify/rules.py` | post-classification distress rules (promote clear first-person distress to `rescue_needed`) |
 | `aquaalert/chatbot/` | RAG over guideline PDFs in `data/docs/` + latest daily briefs: FAISS, multilingual MiniLM embeddings, cited answers |
+| `aquaalert/language/` | language ID: native scripts + romanised Hindi/Malayalam/Bengali, code-mixing flag; per-language evaluation |
+| `aquaalert/credibility/` | heuristic misinformation score (0-1) with reasons |
 | `aquaalert/pipeline.py` | ingest -> classify -> extract |
 | `dashboard/` | Streamlit + Folium app |
 
@@ -95,6 +97,58 @@ layer), HTML (main `<article>` content), `.txt`, `.md`. Letter-spaced small-caps
 chunks are ~450 characters so the 128-token multilingual encoder embeds each one in full.
 
 CLI: `python -m aquaalert.chatbot.ask "What should be in an emergency kit?"`
+
+## Languages
+`language/detect.py` labels each post `en`, `hi`, `ml`, `bn`, `as` (and other Indic scripts) from Unicode blocks, or
+`hi-Latn` / `ml-Latn` / `bn-Latn` for romanised text, using small lexicons of frequent romanised words; `code_mixed` marks
+Indian-language posts mixed with English. Place names are matched in Malayalam, Devanagari and Bengali script too,
+including Malayalam case endings (ചെങ്ങന്നൂരിൽ, എറണാകുളത്ത് → Chengannur, Ernakulam).
+
+`data/sample_posts_multilingual.csv` adds 44 synthetic labelled posts (native script, romanised and code-mixed Hindi,
+Malayalam, Bengali). `python -m aquaalert.language.evaluate` reports, per language (accuracy on the gold labels):
+
+| Language | Posts | Language ID | MuRIL | MuRIL + rules | embed_lr | Keyword |
+|---|---:|---:|---:|---:|---:|---:|
+| English | 45 | 1.00 | 0.73 | 0.80 | 0.69 | 1.00* |
+| Hindi (Devanagari) | 9 | 1.00 | 0.89 | 0.89 | 0.89 | 0.33 |
+| Malayalam (script) | 11 | 1.00 | 0.73 | 0.73 | 0.46 | 0.27 |
+| Bengali (script) | 7 | 1.00 | 0.86 | 0.86 | 0.14 | 0.00 |
+| Hinglish | 9 | 1.00 | 0.44 | 0.56 | 0.11 | 0.89* |
+| Manglish | 7 | 1.00 | 0.43 | 0.43 | 0.14 | 0.00 |
+| Banglish | 6 | 0.83 | 0.17 | 0.17 | 0.00 | 0.83* |
+
+\* the keyword fallback's rules were written against these same sample posts, so its scores here are not meaningful.
+
+Takeaways (from very small synthetic sets written by us, so directional only): MuRIL transfers reasonably to
+native-script Hindi/Bengali/Malayalam despite being fine-tuned on English HumAID, but romanised and code-mixed posts are
+weak (0.17-0.56): missing-person posts ("laapata", "kanathayi", "nikhoj") are read as irrelevant and rescue requests as
+supply requests. **Recommendation:** before retraining, collect a few hundred real labelled romanised/code-mixed posts
+(or transliterate part of HumAID into romanised Hindi/Malayalam with `indic-transliteration`) and fine-tune with them
+mixed in; native-script performance does not justify retraining on its own. Language-ID accuracy is on the same
+synthetic posts the lexicons were developed against, so treat it as optimistic.
+
+## Credibility (heuristic, not a trained model)
+`credibility/heuristics.py` gives every post a **misinformation score from 0 (no red flags) to 1** from transparent
+rules, and lists the reasons on the dashboard (table column and map popup; flagged markers are hollow and dashed).
+It is a set of hand-written heuristics, **not a trained or validated model**: treat a high score as "check this before
+acting", never as proof, and a zero score as "no known red flags", not as verified.
+
+| Signal | Weight | Example |
+|---|---:|---|
+| Older / recycled event | 0.30-0.35 | "Kedarnath flood 2013 video", a year before the post's year |
+| Dam-breach claim without a source | 0.40 | "Mullaperiyar dam has broken" (also Malayalam/Hindi/Bengali forms) |
+| Death toll without a source | 0.30 | "500 people dead in Chengannur" |
+| Urgency-forwarding | 0.35 | "forward to all", "share before it is deleted", "sabko forward karo", "ഫോർവേഡ്" |
+| Contradiction | 0.30 | "everyone is safe" while ≥2 rescue requests are within 25 km / 6 h or in today's district brief; a dam-breach claim within 24 h of an attributed denial about the same dam |
+| Copy-pasted text | 0.15-0.25 | the same appeal posted by several accounts (often outdated) |
+| "Truth is being hidden" / "!!!" | 0.20 / 0.10 | |
+
+Flags combine as independent evidence (`1 - Π(1 - w)`); citing an official source or link halves the score, and
+corrections ("this photo is from 2015, don't forward") are recognised as debunks. Daily briefs leave out posts scoring
+≥ 0.5 (and say how many), and the sidebar can hide them everywhere. `data/sample_posts_rumours.csv` holds 16 synthetic
+rumour / debunk / control posts; `python -m aquaalert.credibility.evaluate` shows all 10 rumours scoring ≥ 0.3 and no
+other sample post scoring above 0 — but the set was written together with the rules, so this only shows that each rule
+does what it says.
 
 ## Geocoding
 Offline gazetteer first, then (if `AQUAALERT_GEOCODE_ONLINE=true`) Nominatim bounded to Kerala. Results are

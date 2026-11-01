@@ -43,7 +43,9 @@ class Post(BaseModel):
     source: str = "unknown"  # twitter, news, sample, ...
     author: str | None = None
     url: str | None = None  # link to the original post/article, when the dataset has one
-    language: str | None = None  # filled by language/ (Phase 2)
+    language: str | None = None  # language/: en, hi, ml, bn, as, hi-Latn, ml-Latn, bn-Latn, ...
+    code_mixed: bool | None = None  # language/: Indian language mixed with English
+    gold_language: str | None = None  # language tag from the dataset, when present (evaluation only)
 
     # Ground-truth label when the dataset provides one (used for eval, not by stages)
     gold_label: Label | None = None
@@ -55,8 +57,10 @@ class Post(BaseModel):
     model_label: Label | None = None  # the classifier's own label when a rule overrode it
     rule: str | None = None  # name of the post-classification rule that fired, if any
 
-    # credibility/ (Phase 2)
-    credibility: float | None = Field(default=None, ge=0, le=1)
+    # credibility/: heuristic misinformation score (0 = no red flags) and the reasons behind it
+    misinfo_score: float | None = Field(default=None, ge=0, le=1)
+    misinfo_reasons: list[str] = Field(default_factory=list)
+    credibility: float | None = Field(default=None, ge=0, le=1)  # 1 - misinfo_score
 
     # extract/
     extraction: Extraction | None = None

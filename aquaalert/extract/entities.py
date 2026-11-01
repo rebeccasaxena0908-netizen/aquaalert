@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
-from aquaalert.extract.gazetteer import DISTRICT_OF, KERALA_PLACES
+from aquaalert.extract.gazetteer import DISTRICT_OF, KERALA_PLACES, NATIVE_ALIASES
 from aquaalert.extract.geocode import Geocoder
 from aquaalert.schemas import Extraction, Post
 
@@ -34,11 +35,26 @@ def extract_phones(text: str) -> list[str]:
     return seen
 
 
+def _native_hits(text: str) -> list[tuple[int, str]]:
+    """(position, canonical place) for native-script names; prefix match so case endings don't block it."""
+    hits = []
+    for alias, place in NATIVE_ALIASES.items():
+        start = text.find(alias)
+        while start != -1:
+            before = text[start - 1] if start else " "
+            if not (before.isalpha() or unicodedata.category(before).startswith("M")):  # start of a word
+                hits.append((start, place))
+                break
+            start = text.find(alias, start + 1)
+    return hits
+
+
 def extract_locations(text: str) -> list[str]:
-    """Gazetteer hits first (canonical lowercase-title form), then capitalised 'in/at/near X'."""
+    """Gazetteer hits (Latin and native script, in text order), then capitalised 'in/at/near X'."""
     found: list[str] = []
-    for m in _PLACE_RE.finditer(text):
-        name = m.group(1).title()
+    ordered = [(m.start(), m.group(1).lower()) for m in _PLACE_RE.finditer(text)] + _native_hits(text)
+    for _, place in sorted(ordered):
+        name = place.title()
         if name not in found:
             found.append(name)
     for m in _PREP_RE.finditer(text):

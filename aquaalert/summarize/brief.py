@@ -20,6 +20,7 @@ from aquaalert.summarize.providers import (BriefInput, BriefPost, Provider, Temp
                                            get_provider)
 
 MAX_POSTS = 20  # posts shown to the model per district-day
+MAX_MISINFO = 0.5  # posts at or above this heuristic misinformation score are left out of briefs
 MAX_TEXT = 280
 # most urgent first
 PRIORITY = [Label.RESCUE_NEEDED, Label.MISSING_PERSON, Label.INFRASTRUCTURE_DAMAGE, Label.NEED_SUPPLIES,
@@ -46,15 +47,25 @@ class DistrictBrief(BaseModel):
     cached: bool = False
     dropped_citations: list[str] = Field(default_factory=list)  # ids the model cited that were not in the input
     fallback_reason: str | None = None  # set when the LLM call failed and the offline template was used
+    excluded_doubtful: int = 0  # posts left out because of a high misinformation score
+
+
+def _doubtful(p: Post) -> bool:
+    return (p.misinfo_score or 0) >= MAX_MISINFO
 
 
 def _select(posts: list[Post]) -> list[Post]:
-    usable = [p for p in posts if p.label and p.label != Label.IRRELEVANT]
+    usable = [p for p in posts if p.label and p.label != Label.IRRELEVANT and not _doubtful(p)]
     usable.sort(key=lambda p: (_RANK[p.label], -(p.label_score or 0), p.timestamp))
     return usable
 
 
 def build_inputs(posts: list[Post]) -> dict[tuple[str, date], tuple[BriefInput, list[Post]]]:
+    """Group posts by (district, day); see daily_briefs. Posts with a high misinfo score are skipped."""
+    return {k: (inp, shown) for k, (inp, shown, _) in _build_inputs(posts).items()}
+
+
+def _build_inputs(posts: list[Post]) -> dict[tuple[str, date], tuple[BriefInput, list[Post], int]]:
     """Group posts by (district, day). Posts with no district are skipped."""
     groups: dict[tuple[str, date], list[Post]] = defaultdict(list)
     for p in posts:
@@ -70,7 +81,8 @@ def build_inputs(posts: list[Post]) -> dict[tuple[str, date], tuple[BriefInput, 
         # phone numbers are personal data: keep them out of text sent to a third-party LLM
         brief_posts = [BriefPost(p.id, p.label.value, PHONE_RE.sub("<phone>", p.text)[:MAX_TEXT], p.extraction.geo_source,
                                  p.extraction.people_count, p.url) for p in shown]
-        out[(district, day)] = (BriefInput(district, day.isoformat(), dict(counts), brief_posts), shown)
+        doubtful = sum(_doubtful(p) for p in members)
+        out[(district, day)] = (BriefInput(district, day.isoformat(), dict(counts), brief_posts), shown, doubtful)
     return out
 
 
@@ -136,18 +148,28 @@ def daily_briefs(posts: list[Post], provider: Provider | None = None, cache_path
     cache = _Cache(cache_path or get_settings().cache_dir / "summaries.json") if provider.uses_network else None
     briefs: list[DistrictBrief] = []
     failure: str | None = None
-    for (district, d), (inp, shown) in build_inputs(posts).items():
+    for (district, d), (inp, shown, doubtful) in _build_inputs(posts).items():
         if day is not None and d != day:
             continue
+        brief = None
         if failure is None:
             try:
-                briefs.append(summarize_district(inp, shown, provider, cache))
-                continue
+                brief = summarize_district(inp, shown, provider, cache)
             except RuntimeError as exc:  # timeout / HTTP error / empty reply: stop calling the API this run
                 failure = str(exc)
-        fallback = summarize_district(inp, shown, TemplateProvider(), None)
-        briefs.append(fallback.model_copy(update={"fallback_reason": failure}))
+        if brief is None:
+            brief = summarize_district(inp, shown, TemplateProvider(), None).model_copy(update={"fallback_reason": failure})
+        briefs.append(brief.model_copy(update={"excluded_doubtful": doubtful}))
     return sorted(briefs, key=lambda b: (-b.counts.get("rescue_needed", 0), b.district))
+
+
+def latest_per_district(briefs: list[DistrictBrief]) -> list[DistrictBrief]:
+    """Each district's most recent brief."""
+    latest: dict[str, DistrictBrief] = {}
+    for b in briefs:
+        if b.district not in latest or b.date > latest[b.district].date:
+            latest[b.district] = b
+    return list(latest.values())
 
 
 def main() -> None:

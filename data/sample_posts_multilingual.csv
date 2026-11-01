@@ -1,0 +1,45 @@
+id,text,timestamp,source,author,label,lang
+m001,"चेंगन्नूर में हमारे घर की छत पर 8 लोग फंसे हैं, पानी तेज़ी से बढ़ रहा है। कृपया नाव भेजिए! 9847011122",2018-08-15 07:20:00,sample-multilingual,ml_user_00,rescue_needed,hi
+m002,"आलुवा के राहत शिविर में पीने का पानी और खाना खत्म हो गया है, 150 लोग हैं।",2018-08-15 08:10:00,sample-multilingual,ml_user_01,need_supplies,hi
+m003,"हमारे पास कोच्चि में 2 नावें और 10 स्वयंसेवक तैयार हैं, संपर्क करें।",2018-08-15 09:05:00,sample-multilingual,ml_user_02,offer_help,hi
+m004,"मेरी माँ सरला (65) त्रिशूर से लापता हैं, आखिरी बार मंगलवार को देखा गया।",2018-08-15 10:30:00,sample-multilingual,ml_user_03,missing_person,hi
+m005,"इडुक्की में भूस्खलन से सड़क पूरी तरह टूट गई है, पुल भी बह गया।",2018-08-15 11:15:00,sample-multilingual,ml_user_04,infrastructure_damage,hi
+m006,मौसम विभाग ने वायनाड के लिए अगले 24 घंटे का रेड अलर्ट जारी किया है।,2018-08-15 12:00:00,sample-multilingual,ml_user_05,info_update,hi
+m007,आज शाम क्रिकेट मैच कौन देख रहा है?,2018-08-15 12:40:00,sample-multilingual,ml_user_06,irrelevant,hi
+m008,"कुट्टनाड में 20 लोग फंसे हैं, बच्चे भी हैं, जल्दी मदद भेजें",2018-08-15 13:20:00,sample-multilingual,ml_user_07,rescue_needed,hi
+m044,"Kochi में flood बहुत serious है, please help us, हम stuck हैं",2018-08-15 14:05:00,sample-multilingual,ml_user_08,rescue_needed,hi
+m009,"Hum Aluva me ghar ki chhat par phanse hain, 6 log hain, jaldi boat bhejo",2018-08-15 07:45:00,sample-multilingual,ml_user_09,rescue_needed,hi-Latn
+m010,"Kochi relief camp me dawai aur khana chahiye, bahut log hain yahan",2018-08-15 09:40:00,sample-multilingual,ml_user_10,need_supplies,hi-Latn
+m011,"Mere paas truck hai, Thrissur se khana le ja sakta hoon, koi batao kahan bhejna hai",2018-08-15 11:50:00,sample-multilingual,ml_user_11,offer_help,hi-Latn
+m012,"Idukki dam ke shutters khol diye gaye hain, nadi ke paas mat jao",2018-08-15 15:10:00,sample-multilingual,ml_user_12,info_update,hi-Latn
+m013,"Mera bhai Rahul Chengannur se laapata hai, kisi ko dikhe toh batao please",2018-08-15 16:00:00,sample-multilingual,ml_user_13,missing_person,hi-Latn
+m014,"ചെങ്ങന്നൂരിൽ ഞങ്ങളുടെ വീടിന്റെ മുകളിൽ 12 പേർ കുടുങ്ങി കിടക്കുന്നു, വെള്ളം കൂടുന്നു. ദയവായി ബോട്ട് അയക്കൂ! 9447012345",2018-08-15 06:50:00,sample-multilingual,ml_user_14,rescue_needed,ml
+m015,"കുട്ടനാട്ടിൽ ഒരു പള്ളിയിൽ 30 പേർ കുടുങ്ങിയിട്ടുണ്ട്, ഭക്ഷണവും വെള്ളവും ഇല്ല",2018-08-15 08:25:00,sample-multilingual,ml_user_15,rescue_needed,ml
+m016,"ആലപ്പുഴയിലെ ദുരിതാശ്വാസ ക്യാമ്പിൽ കുടിവെള്ളവും മരുന്നും അത്യാവശ്യം, 200 പേർ ഉണ്ട്",2018-08-15 09:30:00,sample-multilingual,ml_user_16,need_supplies,ml
+m017,പന്തളം ക്യാമ്പിൽ കുട്ടികൾക്ക് പാലും വസ്ത്രങ്ങളും വേണം,2018-08-15 10:45:00,sample-multilingual,ml_user_17,need_supplies,ml
+m018,"തൃശൂരിൽ നിന്ന് 3 ബോട്ടുകളും 15 വളണ്ടിയർമാരും തയ്യാർ, ബന്ധപ്പെടുക",2018-08-15 11:25:00,sample-multilingual,ml_user_18,offer_help,ml
+m019,എറണാകുളത്ത് 20 കുടുംബങ്ങൾക്ക് താമസിക്കാൻ ഞങ്ങളുടെ വീട്ടിൽ സൗകര്യമുണ്ട്,2018-08-15 12:20:00,sample-multilingual,ml_user_19,offer_help,ml
+m020,"എന്റെ അച്ഛൻ രാമൻ (70) ആലുവയിൽ നിന്ന് കാണാനില്ല, ആർക്കെങ്കിലും വിവരം ഉണ്ടെങ്കിൽ അറിയിക്കുക",2018-08-15 13:05:00,sample-multilingual,ml_user_20,missing_person,ml
+m021,"മൂന്നാറിൽ മണ്ണിടിച്ചിൽ, പ്രധാന റോഡ് തകർന്നു, പാലം ഒലിച്ചുപോയി",2018-08-15 14:30:00,sample-multilingual,ml_user_21,infrastructure_damage,ml
+m022,"ഇടുക്കി ഡാമിന്റെ ഷട്ടറുകൾ തുറന്നു, പെരിയാറിന്റെ തീരത്തുള്ളവർ ജാഗ്രത പാലിക്കുക",2018-08-15 15:40:00,sample-multilingual,ml_user_22,info_update,ml
+m023,"ഇന്ന് നല്ല സിനിമ കണ്ടു, എല്ലാവർക്കും ശുഭരാത്രി",2018-08-15 21:10:00,sample-multilingual,ml_user_23,irrelevant,ml
+m043,"ആലുവയിൽ water level rising fast, ഞങ്ങൾ terrace il ആണ്, please send boat",2018-08-15 17:15:00,sample-multilingual,ml_user_24,rescue_needed,ml
+m024,"Njangal Chengannur il veettil kudungi kidakkunnu, vellam kayari, pettennu sahayikkuka",2018-08-15 07:05:00,sample-multilingual,ml_user_25,rescue_needed,ml-Latn
+m025,"Aluva il 5 per kudungiyirikkunnu, thoni venam, please help",2018-08-15 08:55:00,sample-multilingual,ml_user_26,rescue_needed,ml-Latn
+m026,"Pandalam campil bhakshanam onnum kittunnilla, vellam venam",2018-08-15 10:15:00,sample-multilingual,ml_user_27,need_supplies,ml-Latn
+m027,"Ente vandi undu, Kottayam il ninnu food ethikkam, evide venam ennu parayu",2018-08-15 12:35:00,sample-multilingual,ml_user_28,offer_help,ml-Latn
+m028,"Thrissur il vellam irangi thudangi, bus service naale muthal undakum",2018-08-15 18:20:00,sample-multilingual,ml_user_29,info_update,ml-Latn
+m029,"Ente chettan Ranni il ninnu kanathayi, aarenkilum kandal ariyikkuka",2018-08-15 16:45:00,sample-multilingual,ml_user_30,missing_person,ml-Latn
+m030,"Kuttanad il road muzhuvan thakarnnu, current illa",2018-08-15 17:50:00,sample-multilingual,ml_user_31,infrastructure_damage,ml-Latn
+m031,"আলাপ্পুঝায় আমরা ৭ জন একটা বাড়ির ছাদে আটকে আছি, জল বাড়ছে, নৌকা পাঠান",2018-08-15 07:35:00,sample-multilingual,ml_user_32,rescue_needed,bn
+m032,"কোচির ত্রাণ শিবিরে খাবার আর ওষুধ দরকার, অনেক শ্রমিক আছে",2018-08-15 10:05:00,sample-multilingual,ml_user_33,need_supplies,bn
+m033,"আমরা এর্নাকুলামে বাংলা জানা স্বেচ্ছাসেবক, শ্রমিকদের সাহায্য করতে প্রস্তুত",2018-08-15 11:40:00,sample-multilingual,ml_user_34,offer_help,bn
+m034,"আমার ভাই রফিক আলুভা থেকে নিখোঁজ, কেউ দেখলে জানাবেন",2018-08-15 13:45:00,sample-multilingual,ml_user_35,missing_person,bn
+m035,"ত্রিশুরে রাস্তা ভেঙে গেছে, বিদ্যুৎ নেই দুই দিন ধরে",2018-08-15 15:25:00,sample-multilingual,ml_user_36,infrastructure_damage,bn
+m036,"ইডুক্কি বাঁধের গেট খোলা হয়েছে, নদীর ধারে যাবেন না",2018-08-15 16:30:00,sample-multilingual,ml_user_37,info_update,bn
+m037,"কুট্টানাডে আমাদের ১০ জন আটকে আছে, দয়া করে উদ্ধার করুন",2018-08-15 18:05:00,sample-multilingual,ml_user_38,rescue_needed,bn
+m038,"Amra Chengannur e ekta barir chhade atke achhi, jol barche, nouka pathan",2018-08-15 08:40:00,sample-multilingual,ml_user_39,rescue_needed,bn-Latn
+m039,"Kochi camp e khabar ar oshudh dorkar, amader 40 jon manush",2018-08-15 11:00:00,sample-multilingual,ml_user_40,need_supplies,bn-Latn
+m040,"Amar bhai Aluva theke nikhoj, keu dekhle janaben",2018-08-15 14:50:00,sample-multilingual,ml_user_41,missing_person,bn-Latn
+m041,"Ami Ernakulam e achhi, Bangla bolte pari, shromikder sahajyo korte parbo",2018-08-15 15:55:00,sample-multilingual,ml_user_42,offer_help,bn-Latn
+m042,"Idukki dam er gate khule deoa hoyeche, nodir dhare jaben na",2018-08-15 19:00:00,sample-multilingual,ml_user_43,info_update,bn-Latn

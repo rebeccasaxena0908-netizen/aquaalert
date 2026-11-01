@@ -215,3 +215,16 @@ def test_connection_errors_become_runtime_errors(monkeypatch, exc):
     monkeypatch.setattr("urllib.request.urlopen", broken)
     with pytest.raises(RuntimeError, match="LLM request failed"):
         post_json("https://example.org/x", {"Authorization": "Bearer secret"}, {})
+
+
+
+def test_briefs_leave_out_doubtful_posts(posts):
+    from aquaalert.summarize.brief import latest_per_district
+
+    target = next(p for p in posts if p.extraction and p.extraction.district == "Alappuzha" and p.label.value == "rescue_needed")
+    doubtful = [p.model_copy(update={"misinfo_score": 0.8}) if p.id == target.id else p for p in posts]
+    b = next(b for b in daily_briefs(doubtful, TemplateProvider()) if b.district == "Alappuzha")
+    assert b.excluded_doubtful == 1 and target.id not in {s.id for s in b.sources}
+    assert f"[{target.id}]" not in b.summary
+    latest = latest_per_district(daily_briefs(posts, TemplateProvider()))
+    assert len({x.district for x in latest}) == len(latest)
