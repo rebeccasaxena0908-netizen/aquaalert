@@ -86,6 +86,20 @@ def test_present_distress_still_detected_after_guards():
     assert apply_rules("We are stranded and the water is rising, please help us", OFFER)[0] == RESCUE
 
 
+@pytest.mark.parametrize("text", [
+    "Water has receded in Chengannur, everyone is safe now, no more rescue needed.",
+    "Rescue is not needed at the school any more, all families moved",
+    "No boats needed at Aluva now, water is going down",
+])
+def test_negated_requests_not_promoted(text):
+    for label in (OFFER, INFO):
+        assert apply_rules(text, label)[0] == label, text
+
+
+def test_negation_only_cancels_its_own_clause():
+    assert apply_rules("No more food needed here, but rescue needed for 5 people on the roof", INFO)[0] == RESCUE
+
+
 def test_unambiguous_requests_still_fire_inside_appeal_wording():
     assert apply_rules("We need rescue, please donate boats and share", OFFER)[0] == RESCUE
     assert apply_rules("Boats needed at Edathua, thank you volunteers", INFO)[0] == RESCUE

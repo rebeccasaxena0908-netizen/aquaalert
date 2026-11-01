@@ -1,0 +1,11 @@
+# Single light theme for the dashboard (the CSS in dashboard/styles.css does the rest; these colours also reach
+# canvas-drawn widgets such as st.dataframe, which CSS cannot style)
+[theme]
+base = "light"
+primaryColor = "#35659E"
+backgroundColor = "#EAF2FB"
+secondaryBackgroundColor = "#E7F0FA"
+textColor = "#212936"
+
+[client]
+toolbarMode = "minimal"

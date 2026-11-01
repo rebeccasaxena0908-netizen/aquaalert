@@ -28,6 +28,13 @@ STRONG_EXPLICIT = re.compile(
     r"|\b(?:bachao|bachaiye|bachalo)\b|\b(?:help|madad)\s+karo\b|\bmadad\s+chahiye\b",
     re.IGNORECASE,
 )
+# "no more rescue needed", "rescue is not needed": the explicit cue negated
+NEGATED = re.compile(
+    r"\b(?:no\s+(?:more\s+|longer\s+|further\s+)?|not\s+|don'?t\s+|doesn'?t\s+)"
+    r"(?:\w+\s+){0,2}?(?:rescue|evacuation|boats?|help)\b[^.!?]{0,15}\b(?:needed|required|need)\b"
+    r"|\b(?:rescue|evacuation|boats?|help)\s+(?:is\s+|are\s+)?(?:not|no\s+longer)\s+(?:needed|required)\b",
+    re.IGNORECASE,
+)
 # Phrases that also appear in fundraising / volunteer appeals ("help us raise money"): blocked by APPEAL
 STRONG_AMBIGUOUS = re.compile(
     # "help us" only when it ends the clause or continues like a distress call ("help us, we are trapped")
@@ -78,7 +85,7 @@ CONF_STRONG, CONF_CONTEXTUAL = 0.80, 0.65  # heuristic confidences for rule-made
 
 def rescue_rule(text: str) -> tuple[str, float] | None:
     """Return (rule name, confidence) if ``text`` shows clear distress, else None."""
-    if STRONG_EXPLICIT.search(text):
+    if STRONG_EXPLICIT.search(NEGATED.sub(" ", text)):
         return "distress_strong", CONF_STRONG
     if APPEAL.search(text) or OFFER.search(text):
         return None

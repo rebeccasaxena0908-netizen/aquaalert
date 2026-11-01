@@ -48,6 +48,11 @@ pytest
 ```bash
 streamlit run dashboard/app.py       # http://localhost:8501
 ```
+Look: a single light "blue sky + frosted glass" theme. Base theme in `dashboard/styles.css`, AquaAlert components
+in `dashboard/app.css` (all classes `aa-`), HTML helpers in `dashboard/theme.py`, Streamlit colours in
+`.streamlit/config.toml`. The animated background (drifting blobs, rising bubbles) pauses with the sidebar toggle and
+respects the OS "reduce motion" setting. A 5-7 minute walkthrough is in [docs/demo_script.md](docs/demo_script.md).
+
 Tabs: **Map** (posts coloured by category, doubtful posts dashed, optional district risk layer), **Warnings**
 (district early warnings with reasons and sensor history), **Daily brief**, **Needs ↔ Offers**, **Chatbot**. The
 sidebar sets the dataset(s), replay time, categories, languages and the low-credibility filter.

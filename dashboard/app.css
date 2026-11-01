@@ -1,0 +1,68 @@
+/* AquaAlert-specific layout and components (base theme: styles.css). All classes prefixed aa-. */
+
+/* ---------- header ---------- */
+.aa-header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; padding: 14px 20px; }
+.aa-logo { width: 40px; height: 40px; border-radius: 11px; flex: 0 0 40px; display: grid; place-items: center;
+  background: linear-gradient(140deg, #8FB9E0, #35659E); box-shadow: 0 4px 12px rgba(53,101,158,.35); }
+.aa-logo svg { width: 20px; height: 20px; }
+.aa-brand { display: flex; flex-direction: column; min-width: 0; }
+.aa-wordmark { font-family: var(--f-head); font-weight: 800; font-size: 18px; text-transform: uppercase;
+  letter-spacing: .16em; color: var(--ink); line-height: 1.1; }
+.aa-subtitle { font-size: 13px; color: var(--muted-text); }
+.aa-chips { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* ---------- KPI row ---------- */
+.aa-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 4px 0 14px; }
+.aa-kpi { transition: transform .25s ease, box-shadow .25s ease; display: flex; flex-direction: column; gap: 6px; }
+.aa-kpi:hover { transform: translateY(-3px); box-shadow: 0 14px 38px rgba(45,85,135,.22), inset 0 1px 0 rgba(255,255,255,.9); }
+.aa-kpi .aa-big.aa-accent { color: var(--navy); }
+.aa-kpi .aa-big.aa-err-num { color: var(--err); }
+.aa-kpi .aa-big.aa-warn-num { color: #9A6512; }
+.aa-kpi-note { font-size: 13px; color: var(--ink-soft); line-height: 1.4; }
+
+/* ---------- section bar / panel ---------- */
+.aa-section { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--ice);
+  border: 1px solid var(--rule); border-radius: 12px; padding: 8px 14px; margin: 8px 0 12px; }
+.aa-section .aa-panel-title { margin: 0; }
+.aa-section .aa-muted { font-size: 13px; }
+
+/* ---------- legend ---------- */
+.aa-legend { display: flex; flex-direction: column; gap: 8px; }
+.aa-legend-row { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink); }
+.aa-dot { width: 12px; height: 12px; border-radius: 50%; flex: 0 0 12px; border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(33,41,54,.15); }
+.aa-dot.aa-hollow { background: transparent !important; border: 2px dashed var(--muted-text); box-shadow: none; }
+.aa-count { margin-left: auto; font-family: var(--f-head); font-weight: 600; font-size: 12px; color: var(--ink-soft);
+  font-variant-numeric: tabular-nums; }
+
+/* ---------- briefs, warnings, matches, sources ---------- */
+.aa-card { margin-bottom: 12px; }
+.aa-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.aa-card-head .aa-panel-title { margin: 0; }
+.aa-card p { margin: 0 0 8px; color: var(--ink); }
+.aa-reasons { margin: 6px 0 0; padding-left: 18px; color: var(--ink); }
+.aa-reasons li { margin: 2px 0; }
+.aa-sources { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.aa-source { font-size: 13.5px; color: var(--ink); background: rgba(255,255,255,.55); border: 1px solid var(--rule);
+  border-radius: 10px; padding: 6px 10px; }
+.aa-source .aa-tag { margin-right: 6px; }
+.aa-text-cell { min-width: 220px; max-width: 420px; }
+.aa-meter { display: flex; align-items: center; gap: 8px; min-width: 110px; }
+.aa-meter .aa-bar { flex: 1; }
+
+/* ---------- chatbot ---------- */
+.aa-cite { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--rule);
+  border-radius: 10px; background: rgba(255,255,255,.6); margin-bottom: 6px; font-size: 13.5px; color: var(--ink); }
+.aa-cite-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* ---------- narrow windows ---------- */
+@media (max-width: 1100px) {
+  .aa-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .aa-kpis { grid-template-columns: 1fr; }
+  .aa-chips { margin-left: 0; justify-content: flex-start; }
+  .aa-header { padding: 12px 14px; }
+  .aa-big { font-size: 26px; }
+  .block-container { padding-left: 1rem; padding-right: 1rem; }
+}

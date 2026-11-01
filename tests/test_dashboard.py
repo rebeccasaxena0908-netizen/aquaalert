@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
@@ -11,6 +12,16 @@ from dashboard.helpers import LABEL_COLORS, build_map, build_match_map, jitter, 
 from aquaalert.schemas import LABELS
 
 APP = Path(__file__).resolve().parent.parent / "dashboard" / "app.py"
+
+
+def kpis(at) -> dict[str, int]:
+    """Values of the glass KPI cards (rendered as HTML with data-kpi / data-value attributes)."""
+    return {k: int(v) for md in at.markdown
+            for k, v in re.findall(r'data-kpi="(\w+)" data-value="(\d+)"', md.value)}
+
+
+def page_html(at) -> str:
+    return "\n".join(md.value for md in at.markdown)
 
 
 def _processed(sample_path, tmp_path):
@@ -39,10 +50,12 @@ def test_app_runs_end_to_end(monkeypatch):
         monkeypatch.setenv(k, "")  # tests never depend on (or call) a real LLM
     at = AppTest.from_file(str(APP), default_timeout=60).run()
     assert not at.exception and not at.error
-    metrics = {m.label: m.value for m in at.metric}
-    assert int(metrics["Posts shown"]) > 0 and int(metrics["On map"]) > 0
+    k = kpis(at)
+    assert k["posts"] == 110 and k["rescue"] > 0 and {"warnings", "flagged"} <= set(k)
+    html = page_html(at)
+    assert "aa-header" in html and "aa-sky" in html and "--navy" in html  # theme + background injected
     assert [t.label for t in at.tabs] == ["Map", "Warnings", "Daily brief", "Needs ↔ Offers", "Chatbot"]
-    assert "Matches" in metrics and any("rescue request" in e.label for e in at.expander)  # district briefs rendered
+    assert re.search(r"\d+ matches", html) and any("rescue request" in e.label for e in at.expander)  # briefs rendered
 
 
 def test_match_map(sample_path, tmp_path):
@@ -66,7 +79,8 @@ def test_rule_fired_is_shown(make_post, tmp_path):
                           Geocoder(cache_path=tmp_path / "g.json", online=False))
     row = posts_to_frame(posts).iloc[0]
     assert row["rule"] == "distress_strong" and row["model_label"] == "offer_help" and row["label"] == "rescue_needed"
-    assert "rule: distress_strong (model said offer_help)" in build_map(posts).get_root().render()
+    rendered = build_map(posts).get_root().render()
+    assert "rule: distress strong" in rendered and "the classifier said offer_help" in rendered
 
 
 def test_chatbot_tab_answers_from_briefs_offline(monkeypatch):
@@ -92,11 +106,12 @@ def test_low_credibility_filter_hides_flagged_posts(monkeypatch):
     for k in ("GEMINI_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
         monkeypatch.setenv(k, "")
     at = AppTest.from_file(str(APP), default_timeout=120).run()
-    before = int({m.label: m.value for m in at.metric}["Posts shown"])
-    flagged = int({m.label: m.value for m in at.metric}["Flagged as doubtful"])
+    before_html = page_html(at)
+    before = int(re.search(r"(\d+) shown with current filters", before_html).group(1))
+    flagged = kpis(at)["flagged"]
     assert flagged > 0
     at.sidebar.checkbox[0].check().run()
-    after = int({m.label: m.value for m in at.metric}["Posts shown"])
+    after = int(re.search(r"(\d+) shown with current filters", page_html(at)).group(1))
     assert not at.exception and after < before
 
 
@@ -121,5 +136,36 @@ def test_risk_layer_and_warnings_tab(monkeypatch, sample_path, tmp_path):
     for k in ("GEMINI_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
         monkeypatch.setenv(k, "")
     at = AppTest.from_file(str(APP), default_timeout=120).run()
-    metrics = {m.label: m.value for m in at.metric}
-    assert not at.exception and "Warnings" in metrics and "Watch" in metrics
+    k = kpis(at)
+    assert not at.exception and {"warnings_tab", "watch_tab"} <= set(k)
+
+
+def test_pause_background_toggle(monkeypatch):
+    for key in ("GEMINI_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
+        monkeypatch.setenv(key, "")
+    at = AppTest.from_file(str(APP), default_timeout=120).run()
+    paused_rule = "animation-play-state: paused !important"
+    assert paused_rule not in page_html(at)
+    at.sidebar.toggle[0].set_value(True).run()
+    assert not at.exception and paused_rule in page_html(at)
+
+
+def test_post_text_is_escaped_in_popups(make_post, tmp_path):
+    from aquaalert.classify.base import classify_posts
+    from aquaalert.classify.zeroshot import KeywordZeroShot
+    from aquaalert.extract.entities import extract_posts
+
+    evil = make_post('<img src=x onerror="alert(1)"> people trapped in Aluva, need rescue')
+    posts = extract_posts(classify_posts([evil], KeywordZeroShot()), Geocoder(cache_path=tmp_path / "g.json", online=False))
+    rendered = build_map(posts).get_root().render()
+    assert "<img src=x" not in rendered and "onerror" not in rendered.split("&lt;img")[0]
+
+
+def test_brief_shows_phone_redaction_marker(monkeypatch):
+    for key in ("GEMINI_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
+        monkeypatch.setenv(key, "")
+    at = AppTest.from_file(str(APP), default_timeout=120).run()
+    day = next(s for s in at.selectbox if s.label == "Day")
+    day.set_value(next(o for o in day.options if "2018-08-15" in str(o))).run()  # the day with Chengannur's SOS
+    briefs = [md.value for e in at.expander if "rescue request" in e.label for md in e.markdown]
+    assert any("&lt;phone&gt;" in b for b in briefs)  # rendered as the visible text "<phone>"
