@@ -74,14 +74,15 @@ geopy, faiss-cpu, langchain or llama-index, fastapi, uvicorn, streamlit, folium,
 streamlit-folium, pandas, pydantic, python-dotenv, pytest.
 
 ## Workflow
-- **Training and heavy experiments run on Colab (T4)** through the VS Code Colab extension, using notebooks in
-  `notebooks/`. Never train large models on this Mac (small baselines such as `classify/embed_lr.py` are fine).
+- **Training and heavy experiments run on Colab (T4)** through the VS Code Colab extension, or on **Kaggle Notebooks
+  (T4)** when the Colab GPU quota is used up (`notebooks/train_kaggle.ipynb`, tokens from Kaggle Secrets), using
+  notebooks in `notebooks/`. Never train large models on this Mac (small baselines such as `classify/embed_lr.py` are fine).
 - **Trained models live in private Hugging Face Hub repos** (e.g. `<user>/aquaalert-muril`). Notebooks must upload
   the model at the end, because the Colab disk is wiped on disconnect.
 - **The Mac runs the code, tests, dashboard and demo.** Pull models with `scripts/fetch_model.py`, using
   `HF_TOKEN` from `.env`.
-- **New training notebooks follow `notebooks/train_colab.ipynb`:** GPU check first, tokens entered via hidden
-  `getpass` prompts (never printed or saved), and the HF upload as the final cell.
+- **New training notebooks follow `notebooks/train_colab.ipynb` / `train_kaggle.ipynb`:** GPU check first, tokens from
+  the platform's secrets store or hidden `getpass` prompts (never printed or saved), and the HF upload as the final step.
 
 ## Conventions
 - Config and secrets via `.env` (provide `.env.example`); never hardcode keys.

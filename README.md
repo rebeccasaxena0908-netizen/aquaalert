@@ -79,7 +79,7 @@ python -m aquaalert.summarize.brief data/sample_posts.csv
 python -m aquaalert.chatbot.ask "What should be in an emergency kit?"
 python -m aquaalert.language.evaluate
 python -m aquaalert.credibility.evaluate
-python -m aquaalert.classify.train --train ... --val ... --test ... --label-dataset humaid --out models/muril  # on Colab
+python -m aquaalert.classify.train --train ... --val ... --test ... --label-dataset humaid --out models/muril  # on Colab/Kaggle
 ```
 With `AQUAALERT_CLASSIFIER=auto` the classifier is MuRIL if `models/muril/` exists, then `embed_lr`, then the
 keyword fallback.
@@ -229,8 +229,9 @@ Quality, from a manual spot check of 30 random rows (10 per language):
   "romanised Hindi about Hurricane Harvey" rather than about Kerala; spelling is casual and place names can be misspelt.
 
 Use it only as training data: `python -m aquaalert.classify.train ... --extra-train data/processed/romanised_humaid.csv`
-(dev and test stay HumAID), or `USE_ROMANISED = True` in `notebooks/train_colab.ipynb`, which also evaluates the 44
-hand-written multilingual posts and uploads the model to `<user>/aquaalert-muril-romanised`.
+(dev and test stay HumAID), or `USE_ROMANISED = True` in `notebooks/train_colab.ipynb` (Google Colab) or
+`notebooks/train_kaggle.ipynb` (Kaggle Notebooks, T4; setup steps in its first cell), which also evaluate the 44
+hand-written multilingual posts and upload the model to `<user>/aquaalert-muril-romanised`.
 
 ## Credibility (heuristic, not a trained model)
 `credibility/heuristics.py` gives every post a **misinformation score from 0 (no red flags) to 1** from transparent
