@@ -1,6 +1,7 @@
 # AquaAlert — demo script (5–7 minutes)
 
 A live walkthrough of the dashboard and API on the bundled sample data (Kerala floods, 15–16 August 2018).
+A Hinglish version of the pitch, with the same steps and sample posts, is in [demo_script_hinglish.md](demo_script_hinglish.md).
 Timings are a guide; the bold lines are what to say, the rest is what to do.
 
 ---
