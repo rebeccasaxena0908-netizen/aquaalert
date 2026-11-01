@@ -12,13 +12,16 @@ from streamlit_folium import st_folium  # noqa: E402
 from aquaalert.classify.model import get_classifier  # noqa: E402
 from aquaalert.config import get_settings  # noqa: E402
 from aquaalert.extract.geocode import Geocoder  # noqa: E402
+from aquaalert.fuse.sensors import load_sensors  # noqa: E402
+from aquaalert.fuse.warnings import compute_warnings  # noqa: E402
 from aquaalert.ingest.loader import load_many  # noqa: E402
 from aquaalert.pipeline import process_posts  # noqa: E402
 from aquaalert.match.matcher import default_encoder, match_posts  # noqa: E402
 from aquaalert.chatbot.rag import AUDIENCE_LABEL, brief_passages, default_chatbot  # noqa: E402
 from aquaalert.summarize.brief import daily_briefs, latest_per_district  # noqa: E402
 from aquaalert.summarize.providers import TemplateProvider, get_provider  # noqa: E402
-from dashboard.helpers import FLAG_THRESHOLD, LABEL_COLORS, build_map, build_match_map, posts_to_frame  # noqa: E402
+from dashboard.helpers import (FLAG_THRESHOLD, LABEL_COLORS, RISK_COLORS, build_map, build_match_map,  # noqa: E402
+                               posts_to_frame)
 
 st.set_page_config(page_title="AquaAlert", page_icon="🌊", layout="wide")
 
@@ -36,6 +39,11 @@ def _encoder():
 @st.cache_resource(show_spinner="Loading guideline index...")
 def _chatbot():
     return default_chatbot()
+
+
+@st.cache_data(show_spinner="Loading sensor data...")
+def _sensors():
+    return load_sensors()
 
 
 @st.cache_data(show_spinner="Classifying and geocoding posts...")
@@ -92,12 +100,18 @@ c4.metric("Flagged as doubtful", sum((p.misinfo_score or 0) >= FLAG_THRESHOLD fo
 # Briefs, matching and the chatbot use everything up to the replay clock (minus hidden low-credibility posts),
 # regardless of the category and language filters.
 so_far = [p for p in posts if p.timestamp <= replay_at and credible(p)]
-tab_map, tab_brief, tab_match, tab_chat = st.tabs(["Map", "Daily brief", "Needs ↔ Offers", "Chatbot"])
+readings = _sensors()
+replay_day = replay_at.date() if hasattr(replay_at, "date") else replay_at
+warnings = compute_warnings(so_far, readings, day=replay_day)
+tab_map, tab_warn, tab_brief, tab_match, tab_chat = st.tabs(
+    ["Map", "Warnings", "Daily brief", "Needs ↔ Offers", "Chatbot"])
 
 with tab_map:
     map_col, legend_col = st.columns([4, 1])
     with map_col:
-        st_folium(build_map(visible), height=560, use_container_width=True, returned_objects=[])
+        show_risk = st.checkbox("District risk layer", value=True, help="Early-warning level per district for the replay day")
+        st_folium(build_map(visible, warnings if show_risk else None), height=560, use_container_width=True,
+                  returned_objects=[])
     with legend_col:
         st.subheader("Legend")
         for label, color in LABEL_COLORS.items():
@@ -107,6 +121,40 @@ with tab_map:
             st.bar_chart(df["label"].value_counts())
     st.subheader("Posts")
     st.dataframe(df.sort_values("time", ascending=False) if len(df) else df, width="stretch", hide_index=True)
+
+with tab_warn:
+    st.caption(f"Early warnings for **{replay_day}**: a district is a WARNING when rescue/damage posts spike *and* "
+               "rainfall ≥ 115.6 mm (IMD very heavy) or a river is above its danger level; WATCH when only one holds. "
+               "Sensor files in data/sensors/ are synthetic samples unless you replace them (see README).")
+    if not readings:
+        st.warning("No sensor CSVs found in data/sensors/ — warnings use post volume only.")
+    raised = [w for w in warnings if w.level != "normal"]
+    w1, w2 = st.columns(2)
+    w1.metric("Warnings", sum(w.level == "warning" for w in warnings))
+    w2.metric("Watch", sum(w.level == "watch" for w in warnings))
+    for w in raised:
+        icon = "🔴" if w.level == "warning" else "🟠"
+        with st.expander(f"{icon} {w.district} — {w.level.upper()}", expanded=w.level == "warning"):
+            for r in w.reasons:
+                st.markdown(f"- {r}")
+            if w.post_ids:
+                st.caption("Posts: " + ", ".join(w.post_ids))
+    if not raised:
+        st.success("No district warnings for this day.")
+    st.dataframe([{"district": w.district, "level": w.level, "posts": w.post_count, "baseline/day": w.baseline,
+                   "rain mm": w.rainfall_mm, "river": w.river, "level m": w.river_level_m, "danger m": w.danger_level_m}
+                  for w in warnings], width="stretch", hide_index=True)
+    districts_with_data = sorted({d for d, _ in readings})
+    if districts_with_data:
+        pick = st.selectbox("Sensor history", districts_with_data,
+                            index=districts_with_data.index(raised[0].district) if raised and raised[0].district in districts_with_data else 0)
+        hist = sorted((r for (d, _), r in readings.items() if d == pick), key=lambda r: r.date)
+        chart = {"rainfall mm": [r.rainfall_mm for r in hist]}
+        if any(r.river_level_m is not None for r in hist):
+            chart["river % of danger"] = [round(100 * r.river_ratio, 1) if r.river_ratio else None for r in hist]
+        import pandas as pd
+
+        st.line_chart(pd.DataFrame(chart, index=[r.date for r in hist]))
 
 with tab_brief:
     try:

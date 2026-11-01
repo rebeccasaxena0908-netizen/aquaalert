@@ -8,6 +8,7 @@ import folium
 import pandas as pd
 
 from aquaalert.config import KERALA_BBOX
+from aquaalert.extract.gazetteer import KERALA_PLACES
 from aquaalert.schemas import Post
 
 FLAG_THRESHOLD = 0.5  # misinfo score at which a marker is drawn as "doubtful"
@@ -55,9 +56,29 @@ def jitter(post_id: str, spread: float = 0.012) -> tuple[float, float]:
     return ((digest[0] / 255 - 0.5) * spread, (digest[1] / 255 - 0.5) * spread)
 
 
-def build_map(posts: list[Post]) -> folium.Map:
+RISK_COLORS = {"warning": "#d7191c", "watch": "#fdae61", "normal": "#1a9641"}
+
+
+def add_risk_layer(fmap: folium.Map, warnings: list) -> folium.Map:
+    """District early-warning circles at district centres (no district polygons are bundled)."""
+    layer = folium.FeatureGroup(name="District risk")
+    for w in warnings:
+        center = KERALA_PLACES.get(w.district.lower())
+        if center is None:
+            continue
+        tip = f"{w.district}: {w.level.upper()}" + ("<br>" + "<br>".join(html.escape(r) for r in w.reasons) if w.reasons else "")
+        folium.Circle(center, radius=9000 + 2500 * min(w.post_count, 10), color=RISK_COLORS[w.level],
+                      fill=True, fill_opacity=0.18 if w.level != "normal" else 0.06, weight=2,
+                      tooltip=folium.Tooltip(tip)).add_to(layer)
+    layer.add_to(fmap)
+    return fmap
+
+
+def build_map(posts: list[Post], warnings: list | None = None) -> folium.Map:
     south, west, north, east = KERALA_BBOX
     fmap = folium.Map(location=[(south + north) / 2, (west + east) / 2], zoom_start=7, tiles="OpenStreetMap")
+    if warnings:
+        add_risk_layer(fmap, warnings)
     for p in posts:
         geo = p.extraction.geo if p.extraction else None
         if geo is None or p.label is None:

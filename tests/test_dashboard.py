@@ -41,8 +41,8 @@ def test_app_runs_end_to_end(monkeypatch):
     assert not at.exception and not at.error
     metrics = {m.label: m.value for m in at.metric}
     assert int(metrics["Posts shown"]) > 0 and int(metrics["On map"]) > 0
-    assert [t.label for t in at.tabs] == ["Map", "Daily brief", "Needs ↔ Offers", "Chatbot"]
-    assert "Matches" in metrics and len(at.expander) > 0  # district briefs rendered
+    assert [t.label for t in at.tabs] == ["Map", "Warnings", "Daily brief", "Needs ↔ Offers", "Chatbot"]
+    assert "Matches" in metrics and any("rescue request" in e.label for e in at.expander)  # district briefs rendered
 
 
 def test_match_map(sample_path, tmp_path):
@@ -83,7 +83,8 @@ def test_brief_tab_waits_for_click_when_an_llm_is_configured(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "fake-key-not-used")
     monkeypatch.setenv("AQUAALERT_LLM_PROVIDER", "gemini")
     at = AppTest.from_file(str(APP), default_timeout=120).run()
-    assert not at.exception and len(at.expander) == 0  # nothing generated, no network call made
+    brief_panels = [e for e in at.expander if "rescue request" in e.label]
+    assert not at.exception and brief_panels == []  # no briefs generated, so no network call was made
     assert any("Generate briefs" in b.label for b in at.button)
 
 
@@ -106,3 +107,19 @@ def test_frame_has_language_and_misinfo_columns(sample_path, tmp_path):
     posts = score_posts(detect_posts(_processed(sample_path, tmp_path)))
     df = posts_to_frame(posts)
     assert {"language", "misinfo", "misinfo_reasons"} <= set(df.columns) and set(df["language"]) >= {"en", "hi-Latn"}
+
+
+def test_risk_layer_and_warnings_tab(monkeypatch, sample_path, tmp_path):
+    from datetime import date
+
+    from aquaalert.fuse.warnings import compute_warnings
+
+    posts = _processed(sample_path, tmp_path)
+    ws = compute_warnings(posts, day=date(2018, 8, 15))
+    html = build_map(posts, ws).get_root().render()
+    assert html.count("L.circle(") == len([w for w in ws if w.district.lower() in __import__("aquaalert.extract.gazetteer", fromlist=["x"]).KERALA_PLACES])
+    for k in ("GEMINI_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
+        monkeypatch.setenv(k, "")
+    at = AppTest.from_file(str(APP), default_timeout=120).run()
+    metrics = {m.label: m.value for m in at.metric}
+    assert not at.exception and "Warnings" in metrics and "Watch" in metrics

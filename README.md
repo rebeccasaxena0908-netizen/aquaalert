@@ -3,44 +3,106 @@
 Turns flood-time posts (English, Hindi/Hinglish, Bengali, Malayalam, Assamese) into classified
 help requests on a map. See [CLAUDE.md](CLAUDE.md) for the full architecture and roadmap.
 
-## Status: Phases 1-3
-`ingest -> language -> classify (+ distress rules) -> extract(geo) -> credibility -> summarize / match / chatbot -> Streamlit`,
-runnable with no downloads, training or API keys. Phase 4 (sensor fusion, FastAPI) is next.
+## Status: all four phases
+Every stage in CLAUDE.md is in place and runs with no downloads, training or API keys (synthetic sample data,
+offline fallbacks). Trained MuRIL weights and LLM keys make it better, not possible.
+
+## Architecture
+```
+            ┌──────────── data/sensors/*.csv (rainfall, river levels)
+            │
+ingest ─► language ─► classify ─► extract ─► credibility ─┬─► summarize ─┐
+(CSV/JSON,  (script +   (MuRIL /    (places,   (heuristic  ├─► match       ├─► dashboard (Streamlit)
+ replay)     romanised)  embed_lr /  phones,    misinfo     ├─► fuse ◄─────┘     api (FastAPI)
+                         keyword +   counts,    score)      └─► chatbot (RAG over data/docs + briefs)
+                         rules)      geocode)
+```
+Every stage reads and writes the shared Pydantic `Post` (`aquaalert/schemas.py`); `aquaalert/pipeline.py` runs
+language → classify → extract → credibility over a list of posts.
+
+| Module | Role | Key files | Needs |
+|---|---|---|---|
+| `ingest/` | Load CSV/JSON/JSONL datasets (auto-detected columns, several files at once); replay a dataset in time order as a live feed | `loader.py`, `replay.py` | – |
+| `language/` | Language ID: native Indic scripts by Unicode block, romanised Hindi/Malayalam/Bengali by lexicon; code-mixing flag; per-language evaluation | `detect.py`, `evaluate.py` | – |
+| `classify/` | 7-class crisis classifier. Fine-tuned MuRIL → embed_lr baseline → keyword fallback (auto); distress rule layer; HumAID label mapping; training + evaluation | `model.py`, `rules.py`, `train.py`, `embed_lr.py`, `label_map.py` | MuRIL weights (`scripts/fetch_model.py`) optional |
+| `extract/` | Places (Latin + Malayalam/Devanagari/Bengali names), phones, people counts; offline gazetteer + cached Nominatim; district lookup | `entities.py`, `gazetteer.py`, `geocode.py` | – |
+| `credibility/` | Heuristic 0-1 misinformation score with reasons (not a trained model) | `heuristics.py` | – |
+| `match/` | Needs ↔ offers: multilingual sentence-embedding similarity + haversine proximity | `matcher.py`, `geo.py` | – |
+| `summarize/` | District-wise daily briefs with cited posts; Gemini / Anthropic / OpenAI or offline template; cached | `brief.py`, `providers.py` | an LLM key optional |
+| `fuse/` | District early warnings: post-volume spikes × rainfall / river-level thresholds, with reasons | `sensors.py`, `warnings.py` | sensor CSVs (samples included) |
+| `chatbot/` | RAG over guideline documents + latest briefs: FAISS, multilingual MiniLM, audience-aware retrieval, cited answers | `docs.py`, `index.py`, `rag.py` | docs in `data/docs/` (`scripts/fetch_docs.py`) |
+| `api/` | FastAPI service over all of the above | `main.py` | – |
+| `dashboard/` | Streamlit + Folium: map + district risk layer, warnings, briefs, matches, chatbot | `app.py`, `helpers.py` | – |
 
 ## Quick start
 ```bash
 python3.11 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt      # torch/transformers only needed for training
-cp .env.example .env
-streamlit run dashboard/app.py       # runs on the synthetic samples in data/ (English, multilingual, rumours)
+pip install -r requirements.txt      # torch/transformers are only needed to run or train MuRIL
+cp .env.example .env                 # optional: GEMINI_API_KEY / HF_TOKEN etc.
+python scripts/fetch_docs.py         # optional: NDMA / SDMA guideline documents for the chatbot
+python scripts/fetch_model.py        # optional: the trained MuRIL model (needs HF_TOKEN)
 pytest
 ```
 
-## Modules
-| Path | What it does |
-|---|---|
-| `aquaalert/schemas.py` | Pydantic `Post` shared by all stages |
-| `aquaalert/ingest/` | `loader.py` (CSV/JSON/JSONL), `replay.py` (time-ordered feed simulator) |
-| `aquaalert/classify/` | `zeroshot.py` keyword fallback, `model.py` backend selector, `train.py` MuRIL fine-tuning, `label_map.py` |
-| `aquaalert/extract/` | locations / phones / people counts, offline Kerala gazetteer, cached geocoder |
-| `aquaalert/summarize/` | district-wise daily brief (`brief.py`), providers: offline template, Anthropic, OpenAI-compatible (`providers.py`); cited sources, disk cache |
-| `aquaalert/match/` | needs-vs-offers matching: sentence-embedding cosine + haversine proximity (`matcher.py`, `geo.py`) |
-| `aquaalert/classify/rules.py` | post-classification distress rules (promote clear first-person distress to `rescue_needed`) |
-| `aquaalert/chatbot/` | RAG over guideline PDFs in `data/docs/` + latest daily briefs: FAISS, multilingual MiniLM embeddings, cited answers |
-| `aquaalert/language/` | language ID: native scripts + romanised Hindi/Malayalam/Bengali, code-mixing flag; per-language evaluation |
-| `aquaalert/credibility/` | heuristic misinformation score (0-1) with reasons |
-| `aquaalert/pipeline.py` | ingest -> classify -> extract |
-| `dashboard/` | Streamlit + Folium app |
+### Dashboard
+```bash
+streamlit run dashboard/app.py       # http://localhost:8501
+```
+Tabs: **Map** (posts coloured by category, doubtful posts dashed, optional district risk layer), **Warnings**
+(district early warnings with reasons and sensor history), **Daily brief**, **Needs ↔ Offers**, **Chatbot**. The
+sidebar sets the dataset(s), replay time, categories, languages and the low-credibility filter.
 
-## CLI
+### API
+```bash
+uvicorn api.main:app --reload        # interactive docs: http://127.0.0.1:8000/docs  (ReDoc: /redoc)
+```
+| Endpoint | What it returns |
+|---|---|
+| `GET /health` | status, active classifier, post count, LLM provider, sensor readings |
+| `GET /posts` | processed posts; filters `label` (repeatable), `language`, `district`, `min_confidence`, `max_misinfo`, `since`, `until`, `located`, `limit`, `offset` |
+| `POST /classify` | `{"text": ...}` → label + scores, rule, language, places/phones/geo/district, text-level misinfo score |
+| `GET /matches` | needs ↔ offers (`alpha`, `max_km`, `min_score`, `one_to_one`, `max_misinfo`) |
+| `GET /briefs` | district briefs (`day`, `district`; `llm=true` uses the configured LLM, otherwise the free offline template) |
+| `GET /warnings` | district early warnings for `day` (`level` filter) |
+| `POST /chat/ask` | `{"question": ...}` → cited answer from guidelines + briefs |
+| `GET /labels` | the 7 categories |
+
+Posts are processed once at startup from `AQUAALERT_DATASET`. There is no authentication: run it locally or behind
+your own gateway. Example: `curl -s localhost:8000/warnings?day=2018-08-15&level=warning`.
+
+### CLIs
 ```bash
 python -m aquaalert.ingest.replay data/sample_posts.csv --speed 600
 python -m aquaalert.pipeline data/sample_posts.csv
-python -m aquaalert.classify.train --data data/raw/humaid.csv --label-dataset humaid --out models/muril
+python -m aquaalert.fuse.warnings --day 2018-08-15
+python -m aquaalert.summarize.brief data/sample_posts.csv
+python -m aquaalert.chatbot.ask "What should be in an emergency kit?"
+python -m aquaalert.language.evaluate
+python -m aquaalert.credibility.evaluate
+python -m aquaalert.classify.train --train ... --val ... --test ... --label-dataset humaid --out models/muril  # on Colab
 ```
-Training writes the model and `metrics.json` (accuracy, macro-F1, per-class report) to `--out`.
-With `AQUAALERT_CLASSIFIER=auto` the dashboard uses the trained model if `AQUAALERT_MODEL_DIR` exists,
-otherwise the zero-shot keyword fallback.
+With `AQUAALERT_CLASSIFIER=auto` the classifier is MuRIL if `models/muril/` exists, then `embed_lr`, then the
+keyword fallback.
+
+## Early warnings (fuse/)
+For each district and day, rescue + damage posts are counted (posts with a misinformation score ≥ 0.5 don't count) and
+compared with the previous 3 days. A **WARNING** needs a post spike (≥ 3 posts and ≥ 2 × (baseline + 1)) **and** a
+sensor trigger: rainfall ≥ 115.6 mm/day (IMD "very heavy"; ≥ 204.5 mm is "extremely heavy") or a river at/above its
+danger level. **WATCH** means only one of the two, or a river within 90 % of danger level. Each flag lists its reasons.
+
+Sensor CSVs go in `data/sensors/` with columns `district, date` and `rainfall_mm` and/or `river_level_m, danger_level_m`
+(optional `river`). Several gauges per district-day are combined (highest rainfall; the river gauge nearest its
+danger level). **The included files are synthetic** (`scripts/make_sensor_samples.py`): shaped like August 2018 but
+made-up numbers. Because the sample posts only cover 15-16 Aug, their baseline is 0 and any 3 posts count as a spike;
+with a real multi-week feed the baseline does real work.
+
+Real data (portals checked 2026-11-01; none offers a simple bulk CSV, so expect some manual export/reshaping):
+- **Rainfall:** [India-WRIS](https://indiawris.gov.in/wris/) has district-level daily rainfall (actual vs normal) built
+  from IMD grids and state gauges; IMD Pune's [gridded daily rainfall](https://www.imdpune.gov.in/cmpg/Griddata/Rainfall_25_Bin.html)
+  (0.25°, 1901-present) can be averaged per district.
+- **River levels:** CWC's [Flood Forecasting portal](https://ffs.india-water.gov.in/) shows station water levels with
+  warning and danger levels; [cwc.gov.in](https://cwc.gov.in/) publishes daily flood bulletins (PDF) with the same
+  tables. India-WRIS also has river water-level data.
 
 ## Daily briefs
 Without a key the dashboard's **Daily brief** tab writes offline extractive summaries. For LLM summaries add one key to `.env`:
