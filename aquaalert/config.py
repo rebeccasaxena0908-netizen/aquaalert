@@ -12,6 +12,7 @@ load_dotenv(ROOT / ".env")
 
 # Kerala bounding box: (south, west, north, east)
 KERALA_BBOX = (8.17, 74.85, 12.80, 77.42)
+INDIA_BBOX = (8.0, 68.0, 30.0, 97.5)  # initial Live map view (not a filter)
 
 
 DEFAULT_DATASET = "data/sample_posts.csv,data/sample_posts_multilingual.csv,data/sample_posts_rumours.csv"

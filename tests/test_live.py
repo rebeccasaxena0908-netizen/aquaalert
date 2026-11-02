@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+import sqlite3
 
 from aquaalert.ingest import live as L
 from aquaalert.ingest import simulate as S
@@ -157,8 +158,9 @@ def test_bluesky_login_search_parse_and_relogin():
     net = FakeNet(routes)
     client = L.BlueskyClient(fetcher(net), "me.bsky.social", "app-pass-xxxx")
     items = L.poll_bluesky(client, NOW, queries=("flood kerala",))
-    assert [i.author for i in items] == ["resident.example.bsky.social", "malayali.example.bsky.social"]
-    assert items[0].url == "https://bsky.app/profile/resident.example.bsky.social/post/3kabc111"
+    assert [i.author for i in items] == [None, None]  # privacy: text, time and link only
+    assert items[0].url == "https://bsky.app/profile/did:plc:test1/post/3kabc111"
+    assert not any("example.bsky.social" in f"{i.id}{i.url}{i.text}{i.extra}" for i in items)
     assert items[1].lang == "ml" and items[0].published_at.tzinfo
     logins = [c for c in net.calls if "createSession" in c[0]]
     assert len(logins) == 2  # expired token -> one fresh login
@@ -223,7 +225,54 @@ def test_flood_prefilter_multilingual():
     for t in ("Flooding in Kochi", "बाढ़ का पानी", "വെള്ളപ്പൊക്കം", "বন্যা পরিস্থিতি", "heavy rainfall alert", "Periyar river level rising"):
         assert L.is_flood_related(t), t
     for t in ("cricket final in Kochi", "new phone launch", "stock market flooded with orders?"):
-        assert L.is_flood_related(t) == ("flood" in t.lower()), t
+        assert not L.is_flood_related(t), t
+
+
+FILTER_EXAMPLES = json.loads(fx("flood_filter_examples.json"))
+
+
+@pytest.mark.parametrize("ex", FILTER_EXAMPLES["posts"], ids=lambda e: e["why"])
+def test_flood_filter_saved_examples(ex):
+    assert L.is_flood_related(ex["text"]) == ex["flood"]
+
+
+def test_flood_filter_precision_on_the_ten_posts_read():
+    read = [e for e in FILTER_EXAMPLES["posts"] if e["read"]]
+    passed = [e for e in read if L.is_flood_related(e["text"])]
+    assert len(read) == 10 and len(passed) == 7 and all(e["flood"] for e in passed)
+
+
+@pytest.mark.parametrize("text", [
+    "Glacial lake outburst flood warning", "GLOF alert in Sikkim", "Inundation of low-lying wards", "severe waterlogging in Patna",
+    "water logging on NH-27", "Cloudburst in Uttarkashi", "गुड़गांव में जलभराव", "उत्तरकाशी में बादल फटना", "ग्लेशियर झील फटी",
+    "കൊച്ചിയിൽ വെള്ളക്കെട്ട്", "ഇടുക്കിയിൽ മേഘവിസ്ഫോടനം", "কলকাতায় জলমগ্ন রাস্তা", "floodwater enters homes", "Flood alert: thousands flood-hit",
+    "Farmers flood relief demand", "Thousands flood Delhi over voter lists as flood alert issued in Assam",
+])
+def test_flood_filter_new_terms_and_real_floods(text):
+    assert L.is_flood_related(text)
+
+
+@pytest.mark.parametrize("text", [
+    "Protesters flood the streets with banners", "A flood of tweets about the match", "Fans flood Mumbai over the final",
+    "New floodlights at the stadium", "Inbox flooded with messages", "पूरा देश देख रहा है", "জয়পুর আর বানান প্রতিযোগিতা",
+    "The glacial lake is lovely in spring",
+])
+def test_flood_filter_rejects_non_flood(text):
+    assert not L.is_flood_related(text)
+
+
+def test_old_bluesky_rows_are_scrubbed_of_handles(tmp_path):
+    path = tmp_path / "l.sqlite"
+    L.LiveStore(path)
+    uri = "at://did:plc:test1/app.bsky.feed.post/3kabc111"
+    with sqlite3.connect(path) as c:
+        c.execute("INSERT INTO items VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                  (f"bluesky:{uri}", "bluesky", "social", "flood in Aluva", "https://bsky.app/profile/someone.example/post/3kabc111",
+                   NOW.isoformat(), NOW.isoformat(), "en", "someone.example", "{}", "h"))
+    item_after = L.LiveStore(path).items()[0]
+    assert item_after.author is None and item_after.id == L._bsky_id(uri)
+    assert item_after.url == "https://bsky.app/profile/did:plc:test1/post/3kabc111"
+    assert b"someone.example" not in path.read_bytes()
 
 
 # ---------------------------------------------------------------- simulated incident

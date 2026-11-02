@@ -1,5 +1,13 @@
-"""Small offline gazetteer of Kerala places (name -> lat, lon) used before any network lookup."""
+"""Offline gazetteer (name -> lat, lon) used before any network lookup.
+
+Kerala: the hand-entered table below. Assam, Odisha, West Bengal, Bihar and Uttar Pradesh: gazetteer_india.csv, generated
+from Wikidata by scripts/build_gazetteer.py (each row keeps its Wikidata id). A row with blank coordinates is a river that
+is recognised in text but has no usable point, so it never gets a pin.
+"""
 from __future__ import annotations
+
+import csv
+from pathlib import Path
 
 KERALA_PLACES: dict[str, tuple[float, float]] = {
     "thiruvananthapuram": (8.5241, 76.9366),
@@ -88,3 +96,23 @@ for _alias, _place in list(NATIVE_ALIASES.items()):
     # unsafe ("കൊല്ല" also starts "കൊല്ലപ്പെട്ടു", "was killed"), so the stem is kept with its "ത്ത".
     if _alias.endswith("ം"):
         NATIVE_ALIASES.setdefault(_alias[:-1] + "ത്ത", _place)
+
+
+def _load_india(path: Path) -> list[dict]:
+    with path.open(encoding="utf-8", newline="") as f:
+        return list(csv.DictReader(f))
+
+
+_INDIA_ROWS = _load_india(Path(__file__).with_name("gazetteer_india.csv"))
+INDIA_PLACES: dict[str, tuple[float, float]] = {
+    r["name"]: (float(r["lat"]), float(r["lon"])) for r in _INDIA_ROWS if r["lat"] and r["name"] not in KERALA_PLACES}
+ALL_PLACES: dict[str, tuple[float, float]] = {**INDIA_PLACES, **KERALA_PLACES}
+RIVERS: frozenset[str] = frozenset(r["name"] for r in _INDIA_ROWS if r["kind"] == "river")
+# Names recognised in text (including rivers without a pin), split by whether case can be ignored
+PLACE_NAMES: frozenset[str] = frozenset(KERALA_PLACES) | {r["name"] for r in _INDIA_ROWS if r["case_sensitive"] == "0"}
+CASED_NAMES: frozenset[str] = frozenset(r["name"] for r in _INDIA_ROWS if r["case_sensitive"] == "1")
+# Devanagari / Bengali names of those places. Matched as whole words, see extract/entities.py.
+INDIA_ALIASES: dict[str, str] = {a: r["name"] for r in _INDIA_ROWS for a in r["aliases"].split("|") if a}
+for _r in _INDIA_ROWS:
+    if _r["district"]:
+        DISTRICT_OF.setdefault(_r["name"], _r["district"])

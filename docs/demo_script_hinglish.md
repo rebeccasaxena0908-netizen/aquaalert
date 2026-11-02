@@ -13,7 +13,7 @@
 > | 7. Matching | **s021 → s022** (boats), **m010 → s035** (Hinglish need ↔ English offer). Avoid m011, m019, s038→r012 | 3:50 Needs ↔ Offers |
 > | 8. Early warning | Warnings tab, 15 Aug: **Alappuzha** (13 posts, 196 mm), **Idukki** (Periyar at 91 %) | 4:25 Warnings |
 > | 9. Chatbot | Ask **"बाढ़ से पहले क्या तैयारी करनी चाहिए?"** (needs `scripts/fetch_docs.py`) | 5:00 Chatbot |
-> | 10. Live mode | Dataset → LIVE: official SACHET alerts in the Warnings tab; **Simulate incident** (8 SIMULATED posts, Hinglish SOS first), then **Clear** | Pre-demo checklist |
+> | 10. Live mode | Dataset → LIVE: official SACHET alerts in the Warnings tab, Bluesky posts on the India map; **Simulate incident** (8 SIMULATED posts, Hinglish SOS first), then **Clear** | Pre-demo checklist |
 > | Results | Results tables in the English script / README | 6:15 Results |
 
 # AquaAlert: Hinglish pitch
@@ -31,20 +31,20 @@ Jab bhi koi badi baadh aati hai, jaise Kerala 2018, social media pe hazaaron pos
 7. Matching: Jinko help chahiye aur jo help de rahe hain, unhe text similarity aur doori dono ke hisaab se match karta hai.
 8. Early warning: Posts ki sankhya aur barish ya river level dono dekh ke district ko WATCH ya WARNING deta hai.
 9. Chatbot: NDMA ki guidelines pe based chatbot, jo Hindi mein bhi jawab deta hai aur source batata hai.
-10. Live mode: Official NDMA SACHET alerts live aate hain. Jab asli baadh nahi hoti, feed shaant rehta hai, isliye Simulate incident button hai, jo SIMULATED label ke saath demo posts daalta hai.
+10. Live mode: Official NDMA SACHET alerts aur Bluesky posts live aate hain. Live posts zyadatar news-style hote hain, aur jab asli baadh nahi hoti, feed shaant rehta hai, isliye rescue aur matching Simulate incident button se dikhate hain, jo SIMULATED label ke saath demo posts daalta hai.
 
 ## Results
 Keyword approach ka macro-F1 0.315 tha. Embeddings se 0.605. Fine-tuned MuRIL se 0.727, aur romanised Hinglish/Manglish data ke saath 0.736. Test 15,000 se zyada real tweets pe hua.
 
 ## Honest limitations
 - Demo ke posts aur sensor data synthetic hain, kyunki live flood data tab hi milta hai jab asli baadh ho. Models aur NDMA documents asli hain.
-- Live mode mein SACHET alerts verified hain. News aur Bluesky polling bani hai, lekin abhi live verify nahi hui.
+- Live mode mein SACHET aur Bluesky 2 Nov 2026 ko live verify hue hain. News (GDELT) bani hai, lekin verify nahi hui. Live posts zyadatar news-style hote hain, isliye rescue aur matching Simulate incident se dikhate hain.
 - Romanised training data AI se banaya gaya hai, isliye real social media pe accuracy kam ho sakti hai. Per-language test sets bahut chhote hain (6-11 posts).
 - Rescue class ke sirf 22 test examples the, isliye us number pe zyada bharosa nahi karna chahiye.
 - Rule layer HumAID score ko thoda kam karta hai (0.736 se 0.731), lekin rescue requests miss na hon, isliye rakha hai.
 
 ## Possible questions
-- "Ye real-time hai?" Official SACHET alerts live hain. Baaki feeds quiet reh sakte hain jab baadh nahi hoti, isliye replay mode aur simulate button bhi hain.
+- "Ye real-time hai?" SACHET aur Bluesky live hain (2 Nov 2026 ko verify hue); news (GDELT) verify nahi hui. Live posts zyadatar news-style hote hain aur feeds quiet reh sakte hain, isliye replay mode aur simulate button bhi hain.
 - "Accuracy kitni hai?" Macro-F1 0.736, lekin chhoti classes pe number noisy hai.
 - "Rules kyun?" Emergency mein rescue request miss karna false alarm se zyada mehnga hai.
 - "Iska fayda kya hai?" Rescue teams ko ek map pe dikh jaata hai kahaan jaana hai, aur rumours se bachne mein madad milti hai.

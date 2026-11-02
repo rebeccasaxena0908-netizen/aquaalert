@@ -4,15 +4,24 @@ from __future__ import annotations
 import re
 import unicodedata
 
-from aquaalert.extract.gazetteer import DISTRICT_OF, KERALA_PLACES, NATIVE_ALIASES
+from aquaalert.extract.gazetteer import (ALL_PLACES, CASED_NAMES, DISTRICT_OF, INDIA_ALIASES, NATIVE_ALIASES, PLACE_NAMES,
+                                         RIVERS)
 from aquaalert.extract.geocode import Geocoder
 from aquaalert.schemas import Extraction, Post
 
 PHONE_RE = re.compile(r"(?<!\d)(?:\+?91[-\s]?)?([6-9]\d{9})(?!\d)")
 _PLACE_RE = re.compile(
-    r"\b(" + "|".join(sorted(map(re.escape, KERALA_PLACES), key=len, reverse=True)) + r")\b",
+    r"\b(" + "|".join(sorted(map(re.escape, PLACE_NAMES), key=len, reverse=True)) + r")\b",
     re.IGNORECASE,
 )
+# Names that are also everyday words ("aa gaya", "basti", "banda"): only as "Gaya" or "GAYA"
+_CASED_PLACE_RE = re.compile(
+    r"\b(" + "|".join(re.escape(v) for n in sorted(CASED_NAMES, key=len, reverse=True) for v in (n.title(), n.upper())) + r")\b")
+_LETTER = r"[\w\u0900-\u097F\u0980-\u09FF]"
+# Whole-word Devanagari / Bengali names; Bengali attaches short endings (কানপুরে = in Kanpur)
+_ALIAS_RE = re.compile(
+    rf"(?<!{_LETTER})(" + "|".join(sorted(map(re.escape, INDIA_ALIASES), key=len, reverse=True)) +
+    rf")(?:ে|র|ের|য়|য়ে|তে|কে|ও|এ)?(?!{_LETTER})")
 # "in Foo Bar", "at Foo", "near Foo" for places the gazetteer doesn't know (geocoded online)
 _PREP_RE = re.compile(r"\b(?:in|at|near|from|around)\s+((?:[A-Z][a-z]+)(?:\s[A-Z][a-z]+)?)")
 _STOPWORDS = {"The", "This", "That", "Kerala", "India", "Please", "Aug", "Tuesday", "Monday"}
@@ -49,10 +58,15 @@ def _native_hits(text: str) -> list[tuple[int, str]]:
     return hits
 
 
+def _alias_hits(text: str) -> list[tuple[int, str]]:
+    return [(m.start(), INDIA_ALIASES[m.group(1)]) for m in _ALIAS_RE.finditer(unicodedata.normalize("NFC", text))]
+
+
 def extract_locations(text: str) -> list[str]:
     """Gazetteer hits (Latin and native script, in text order), then capitalised 'in/at/near X'."""
     found: list[str] = []
-    ordered = [(m.start(), m.group(1).lower()) for m in _PLACE_RE.finditer(text)] + _native_hits(text)
+    ordered = [(m.start(), m.group(1).lower()) for r in (_PLACE_RE, _CASED_PLACE_RE) for m in r.finditer(text)]
+    ordered += _native_hits(text) + _alias_hits(text)
     for _, place in sorted(ordered):
         name = place.title()
         if name not in found:
@@ -61,7 +75,7 @@ def extract_locations(text: str) -> list[str]:
         name = m.group(1)
         if name in _STOPWORDS or name.split()[0] in _STOPWORDS:
             continue
-        if name.lower() not in KERALA_PLACES and name not in found:
+        if name.lower() not in ALL_PLACES and name not in found:
             found.append(name)
     return found
 
@@ -82,7 +96,8 @@ def extract_post(post: Post, geocoder: Geocoder | None = None) -> Post:
     geocoder = geocoder or Geocoder()
     locations = extract_locations(post.text)
     geo, geo_source = None, None
-    for loc in locations:
+    # a town or district is a better pin than a point somewhere on a river
+    for loc in sorted(locations, key=lambda name: name.lower() in RIVERS):
         geo = geocoder.geocode(loc)
         if geo:
             geo_source = loc

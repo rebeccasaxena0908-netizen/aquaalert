@@ -26,12 +26,14 @@ Timings are a guide; the bold lines are what to say, the rest is what to do.
 2. **Check the SACHET card** under the header: `ok` with a recent "last success" time is good; `slow` means it is
    working but near its 120 s budget (stored alerts stay visible). `failed` means the feed is down: open
    <https://sachet.ndma.gov.in/cap_public_website/rss/rss_india.xml> in a browser to confirm, and plan to use Replay.
-   The News (GDELT) card may show `failed` when GDELT is rate-limiting (it did on 2026-11-01); Bluesky shows `skipped`
-   without an app password. Both are fine for the demo, and no source can freeze the page: polling runs in the background.
+   **Live-source claims:** SACHET and Bluesky were verified live on 2 Nov 2026; news (GDELT) is built but not verified,
+   and its card may show `failed` when GDELT is rate-limiting. Bluesky shows `skipped` without an app password. No source
+   can freeze the page: polling runs in the background.
 3. **Check the Gemini key**: ask the chatbot one question. An HTTP 429 / timeout notice means briefs and chat will use
    the offline fallback.
-4. **Expect sparse data.** Outside a flood, Live mode may honestly show "No flood-related items in the last 24h" or
-   only official alerts. Use **Simulate incident** (sidebar) to show the pipeline reacting: 8 posts appear with a
+4. **Expect sparse, news-style data.** Outside a flood, Live mode may honestly show "No flood-related items in the
+   last 24h" or only official alerts, and live posts are mostly news-style, so rescue and matching are shown with
+   Simulate incident. Use **Simulate incident** (sidebar) to show the pipeline reacting: 8 posts appear with a
    SIMULATED badge, Alappuzha goes to WATCH, the dam rumour is flagged, the boats offer matches rescue requests.
    Say clearly that they are simulated, and press **Clear simulated posts** afterwards.
 5. **Fallback:** if anything live misbehaves, switch **Dataset → REPLAY · Kerala Aug 2018 sample** and continue with the
@@ -186,7 +188,8 @@ Limitations to say out loud:
 - **Credibility is heuristic**, tuned on 16 synthetic rumour posts; treat scores as "check this", never as proof.
 - **Synthetic demo data**: posts, rumours and sensor readings are made up (shaped like 2018); the romanised
   training data is LLM-generated (~10 % meaning drift in a spot check; Bengali short of target).
-- **Geocoding** is a gazetteer of ~35 Kerala places plus optional Nominatim; unknown villages are not mapped.
+- **Geocoding** is a gazetteer of 398 mapped places (34 in Kerala entered by hand; 364 in Assam, Odisha, West Bengal,
+  Bihar and Uttar Pradesh from Wikidata) plus optional Nominatim; unknown villages are not mapped.
 - **Matching inherits classifier errors** (see the issues list below).
 - The API has **no authentication**; run it locally.
 

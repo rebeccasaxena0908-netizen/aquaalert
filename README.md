@@ -97,15 +97,15 @@ when something new arrives, and shows "last updated", per-source counts and stat
 original on every post. When nothing flood-related arrived it says so ("No flood-related items in the last 24h") and
 never pads the view with sample data. CLI: `python -m aquaalert.ingest.live --once` or `--loop`.
 
-| Source | What | Access | Status (checked 2026-11-01) |
+| Source | What | Access | Status |
 |---|---|---|---|
-| **NDMA SACHET** | CAP 1.2 alerts from IMD, CWC and state SDMAs. Feeds: `https://sachet.ndma.gov.in/cap_public_website/rss/rss_<feed>.xml` for `india`, `kerala`, `assam`, `bihar`, `odisha`, `uttarakhand`, `karnataka`, `maharashtra`, `gujarat`; each item links to its CAP XML. Flood, heavy-rain and river alerts are kept (event, severity, urgency, area, sender, effective/expires, headline, instruction, link). | Public, no key; no robots.txt (404 = allowed) | **Verified live**: all 9 feeds fetched; 2 heavy-rain alerts kept (Andhra Pradesh SDMA, cyclone rain). Multi-word states (Tamil Nadu, West Bengal, …) returned 404 for every spelling tried, so they come only via the all-India feed. Slow at times (a full poll took ~3 min). |
-| **News (GDELT DOC 2.0)** | English and Hindi flood headlines from Indian sources, with real titles, links and times | Public, no key; ≤ 1 request / 5 s (enforced: 6 s gap; a 429 is retried after 15 s, then 30 s) | **Not verified live**: on 2026-11-01 every API request returned HTTP 429 ("Please limit requests to one every 5 seconds") even 12–42 s apart, after earlier TLS timeouts; robots.txt is absent (404). Tested on a constructed response. |
-| **Bluesky** | `app.bsky.feed.searchPosts` for flood terms in English, Hindi, Malayalam (`sort=latest`, last 24 h) | Needs a login: unauthenticated search returns 403. Session via `com.atproto.server.createSession` on `bsky.social`, kept in memory only | **Not verified live** (no credentials here); tested on a constructed response. Skipped quietly when the credentials are missing. |
+| **NDMA SACHET** | CAP 1.2 alerts from IMD, CWC and state SDMAs. Feeds: `https://sachet.ndma.gov.in/cap_public_website/rss/rss_<feed>.xml` for `india`, `kerala`, `assam`, `bihar`, `odisha`, `uttarakhand`, `karnataka`, `maharashtra`, `gujarat`; each item links to its CAP XML. Flood, heavy-rain and river alerts are kept (event, severity, urgency, area, sender, effective/expires, headline, instruction, link). | Public, no key; no robots.txt (404 = allowed) | **Verified live on 2 Nov 2026** (first on 1 Nov: all 9 feeds fetched; 2 heavy-rain alerts kept (Andhra Pradesh SDMA, cyclone rain)). Multi-word states (Tamil Nadu, West Bengal, …) returned 404 for every spelling tried, so they come only via the all-India feed. Slow at times (a full poll took ~3 min). |
+| **News (GDELT DOC 2.0)** | English and Hindi flood headlines from Indian sources, with real titles, links and times | Public, no key; ≤ 1 request / 5 s (enforced: 6 s gap; a 429 is retried after 15 s, then 30 s) | **Built but not verified**: on 2026-11-01 every API request returned HTTP 429 ("Please limit requests to one every 5 seconds") even 12–42 s apart, after earlier TLS timeouts; robots.txt is absent (404). Tested on a constructed response. |
+| **Bluesky** | `app.bsky.feed.searchPosts` for flood, cloudburst, waterlogging and glacial-lake terms in English, Hindi, Malayalam (`sort=latest`, last 24 h). Only text, time and link are kept: no handle or display name is stored or shown (the link uses the account's DID, and opening it on Bluesky shows the author there). | Needs a login: unauthenticated search returns 403. Session via `com.atproto.server.createSession` on `bsky.social`, kept in memory only | **Verified live on 2 Nov 2026** with an app password. Skipped quietly when the credentials are missing. |
 | ~~Google News RSS~~ | – | **Not used**: `news.google.com/robots.txt` disallows `/` (incl. `/rss`) for generic agents | – |
 
-**Never blocking:** each source polls in its own background thread with a time budget (SACHET 120 s, news 120 s,
-Bluesky 45 s) and 25 s per-request timeouts. SACHET stops fetching CAP documents near its budget and keeps what it
+**Never blocking:** each source polls in its own background thread with a time budget (120 s each for SACHET, news
+and Bluesky) and 25 s per-request timeouts. SACHET stops fetching CAP documents near its budget and keeps what it
 has. The dashboard only reads SQLite, so a slow source never freezes it. Each source shows one of **ok**, **slow**
 (used more than half its budget, returned partial results, or is still running; stored results stay visible),
 **failed** (error, exponential backoff) or **skipped** (not configured, blocked by robots.txt, or the previous poll is
@@ -114,8 +114,14 @@ still running), with its last success time, duration and the reason.
 Politeness: every request checks robots.txt first (unreachable robots.txt = skip this poll; Python's robotparser
 applies the first matching rule, which is stricter than RFC 9309), keeps a minimum gap per host, and sends a
 descriptive User-Agent. Each source fails and backs off on its own (up to 6 h). Items are prefiltered with flood
-keywords (English, Hindi, Malayalam, Bengali, Marathi and romanised forms), deduplicated by id and by text, and keep
-their real publish time, source and URL. Phone numbers are redacted before any text reaches an LLM (briefs).
+keywords (English, Hindi, Malayalam, Bengali, Marathi and romanised forms, including GLOF, inundation, waterlogging and
+cloudburst), after removing non-flood uses of the word ("flood the streets with", "a flood of tweets", "flood Delhi
+over"), deduplicated by id and by text, and keep their real publish time, source and URL. Phone numbers are redacted
+before any text reaches an LLM (briefs).
+
+**Relevance:** the active classifier then runs on every post that passed the filter. Live mode hides posts it labels
+*irrelevant* with at least 80 % confidence, from the map, table, warnings, briefs and matching; add *irrelevant* under
+**Categories** to see them on the map and table. Less confident *irrelevant* posts stay visible.
 
 **Adding Bluesky**: on bsky.app go to *Settings → Privacy and security → App passwords → Add App Password*, then put
 `BLUESKY_HANDLE=yourname.bsky.social` and `BLUESKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx` in `.env` (never your main
@@ -124,12 +130,14 @@ password). Restart the dashboard.
 **Limits** — be honest about these when showing Live mode:
 - **Social data is sparse.** Outside a real flood there may be nothing for hours; Bluesky is small in India, and
   X/Twitter (where 2018's posts were) is a paid API and not used.
+- **Live posts are mostly news-style**, so rescue and matching are shown with **Simulate incident**.
 - **Headlines are not citizen posts.** News titles ("Heavy rain triggers flood alert in Ernakulam") are reports, so the
   classifier mostly labels them *info update*; rescue requests, offers and missing-person posts come from social posts.
 - **Classifier shift.** MuRIL was trained on 2016-2019 disaster tweets (HumAID); 2026 headlines, Bluesky posts and other
   regions differ in style and vocabulary, so expect lower accuracy than the HumAID numbers below.
-- **Geography.** The gazetteer covers ~35 Kerala places; posts from other states are listed but not mapped unless
-  Nominatim is enabled (`AQUAALERT_GEOCODE_ONLINE=true`). SACHET areas are often free text ("At isolated places").
+- **Geography.** The gazetteer maps Kerala, Assam, Odisha, West Bengal, Bihar and Uttar Pradesh (see Geocoding); posts
+  from other states are listed but not mapped unless Nominatim finds them (`AQUAALERT_GEOCODE_ONLINE=true`, Kerala-bounded).
+  Posts naming only a state ("Odisha", "Assam") get no pin. SACHET areas are often free text ("At isolated places").
 - **Warnings.** The bundled sensor files cover August 2018 only, so live warnings use post volume alone (a spike is a
   WATCH); official SACHET alerts are shown separately as "Official alert" entries in the Warnings tab.
 
@@ -336,6 +344,27 @@ does what it says.
 ## Geocoding
 Offline gazetteer first, then (if `AQUAALERT_GEOCODE_ONLINE=true`) Nominatim bounded to Kerala. Results are
 cached in `data/cache/geocode.json`.
+
+The gazetteer maps **398 places**:
+- **364 in Assam, Odisha, West Bengal, Bihar and Uttar Pradesh**: districts, district headquarters, towns of at least
+  50,000 people, Bagaha and 23 rivers, in [`aquaalert/extract/gazetteer_india.csv`](aquaalert/extract/gazetteer_india.csv).
+  **Source: [Wikidata](https://www.wikidata.org) (CC0)**, read through the public
+  [QLever SPARQL endpoint](https://qlever.cs.uni-freiburg.de/wikidata) by `scripts/build_gazetteer.py`, because
+  robots.txt disallows automated access to GeoNames downloads and to Wikidata's own query service for generic agents.
+  Every row keeps its Wikidata id, and the English, Devanagari and Bengali names come from the same entity.
+- **34 in Kerala**, typed in by hand in Phase 1 and not sourced row by row. A Wikidata check found 29 of them: 28 are
+  within about 12 km, and `paravur` is 161 km from the only Wikidata "Paravur" because that is a different town in Kollam
+  (ours is North Paravur). Cheruthoni, Mullaperiyar, Ranni, Thiruvalla and Wayanad were not found under those labels.
+
+Nothing is estimated. Rejected rather than guessed: coordinates outside the place's state (Wikidata puts one Banka entity
+in Slovakia), and names shared by different places (Lakhimpur, Akbarpur, Midnapore; use "Lakhimpur Kheri" or
+"North Lakhimpur"). Same-named places outside these states cannot be told apart, so a "Hamirpur" in Himachal Pradesh would
+pin in Uttar Pradesh; Aurangabad is left out for that reason.
+
+River pins are coarse: one Wikidata point on the river, usually its mouth, used only when a post names no town. Ganga,
+Teesta and Torsa are recognised in text but get no pin, because their nearest Wikidata point is too far from a covered
+town or lies in Bangladesh. Rapti could not be sourced and is not included. Names that are also everyday words (Gaya, Mau,
+Basti, Puri, ...) match only when capitalised, and their ambiguous native spellings are not used.
 
 ## Romanised model: before / after
 `<user>/aquaalert-muril-romanised` is MuRIL fine-tuned on HumAID train **plus the 4,552 LLM-generated romanised posts**

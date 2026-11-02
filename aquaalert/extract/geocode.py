@@ -1,11 +1,11 @@
-"""Cached geocoding: offline gazetteer first, optional Nominatim biased to Kerala."""
+"""Cached geocoding: offline gazetteer first (Kerala + five more states), optional Nominatim biased to Kerala."""
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
 from aquaalert.config import KERALA_BBOX, get_settings
-from aquaalert.extract.gazetteer import KERALA_PLACES
+from aquaalert.extract.gazetteer import INDIA_PLACES, KERALA_PLACES
 from aquaalert.schemas import GeoPoint
 
 
@@ -38,6 +38,8 @@ class Geocoder:
         key = place.strip().lower()
         if not key:
             return None
+        if key in INDIA_PLACES:  # sourced coordinates outside Kerala: the Kerala bbox is only for online results
+            return GeoPoint(lat=INDIA_PLACES[key][0], lon=INDIA_PLACES[key][1])
         if key in self._cache:
             return self._to_point(self._cache[key])
         coords = KERALA_PLACES.get(key) or (self._lookup_online(place) if self.online else None)

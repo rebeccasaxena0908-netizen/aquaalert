@@ -8,10 +8,11 @@ import folium
 import pandas as pd
 
 from aquaalert.config import KERALA_BBOX
-from aquaalert.extract.gazetteer import KERALA_PLACES
-from aquaalert.schemas import Post
+from aquaalert.extract.gazetteer import ALL_PLACES
+from aquaalert.schemas import Label, Post
 
 FLAG_THRESHOLD = 0.5  # misinfo score at which a marker is drawn as "doubtful"
+IRRELEVANT_HIDE_SCORE = 0.8  # Live mode: hide posts labelled irrelevant at or above this confidence
 
 # Map category colours: distinct on the light map and the sky background. Only rescue requests use the status red;
 # amber is reserved for WATCH / low credibility, green (ok) is reused for offers of help.
@@ -99,7 +100,7 @@ def add_risk_layer(fmap: folium.Map, warnings: list) -> folium.Map:
     """District early-warning circles at district centres (no district polygons are bundled)."""
     layer = folium.FeatureGroup(name="District risk")
     for w in warnings:
-        center = KERALA_PLACES.get(w.district.lower())
+        center = ALL_PLACES.get(w.district.lower())
         if center is None:
             continue
         tip = f"{w.district}: {w.level.upper()}" + ("<br>" + "<br>".join(html.escape(r) for r in w.reasons) if w.reasons else "")
@@ -110,9 +111,15 @@ def add_risk_layer(fmap: folium.Map, warnings: list) -> folium.Map:
     return fmap
 
 
-def build_map(posts: list[Post], warnings: list | None = None) -> folium.Map:
-    south, west, north, east = KERALA_BBOX
-    fmap = _themed(folium.Map(location=[(south + north) / 2, (west + east) / 2], zoom_start=7, tiles="OpenStreetMap"))
+def hidden_as_irrelevant(post: Post) -> bool:
+    """Live mode hides posts the classifier is sure are irrelevant; unsure ones stay on screen for a person to judge."""
+    return post.label == Label.IRRELEVANT and (post.label_score or 0) >= IRRELEVANT_HIDE_SCORE
+
+
+def build_map(posts: list[Post], warnings: list | None = None, bbox: tuple[float, float, float, float] = KERALA_BBOX,
+              zoom: int = 7) -> folium.Map:
+    south, west, north, east = bbox
+    fmap = _themed(folium.Map(location=[(south + north) / 2, (west + east) / 2], zoom_start=zoom, tiles="OpenStreetMap"))
     if warnings:
         add_risk_layer(fmap, warnings)
     for p in posts:
@@ -157,10 +164,11 @@ def build_map(posts: list[Post], warnings: list | None = None) -> folium.Map:
     return fmap
 
 
-def build_match_map(matches: list, posts: list[Post]) -> folium.Map:
+def build_match_map(matches: list, posts: list[Post], bbox: tuple[float, float, float, float] = KERALA_BBOX,
+                    zoom: int = 7) -> folium.Map:
     """Map with a line from each need (red) to its matched offer (green)."""
-    south, west, north, east = KERALA_BBOX
-    fmap = _themed(folium.Map(location=[(south + north) / 2, (west + east) / 2], zoom_start=7))
+    south, west, north, east = bbox
+    fmap = _themed(folium.Map(location=[(south + north) / 2, (west + east) / 2], zoom_start=zoom))
     geo = {p.id: p.extraction.geo for p in posts if p.extraction and p.extraction.geo}
     for m in matches:
         n, o = geo.get(m.need_id), geo.get(m.offer_id)

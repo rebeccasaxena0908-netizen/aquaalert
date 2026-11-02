@@ -25,6 +25,7 @@ import re
 import sqlite3
 import threading
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -55,16 +56,39 @@ MAX_CAP_PER_POLL = 25  # CAP documents fetched per poll (the all-India feed list
 REQUEST_TIMEOUT = float(os.getenv("AQUAALERT_LIVE_REQUEST_TIMEOUT", "25"))  # seconds per HTTP request
 # Per-source time budget for one poll (seconds). A source still running past its budget is shown as "slow"; it keeps
 # running in its worker thread and is not started again until it finishes.
-BUDGETS = {"sachet": 120.0, "news": 120.0, "bluesky": 45.0}  # news: room for two 429 retries (15 s + 30 s)
+BUDGETS = {"sachet": 120.0, "news": 120.0, "bluesky": 120.0}  # news: room for two 429 retries (15 s + 30 s)
 SLOW_AFTER = 0.5  # a successful poll that used more than this share of its budget is "slow"
 
-# Flood keywords: English, Hindi, Malayalam, Bengali/Assamese, Marathi, plus romanised forms
-FLOOD_TERMS = re.compile(
-    r"\b(?:flood\w*|inundat\w*|waterlogg\w*|water-logg\w*|cloud\s*burst|deluge|flash\s+flood|heavy\s+rain\w*|"
+# Flood keywords: English, Hindi, Malayalam, Bengali/Assamese, Marathi, plus romanised forms. Short native words are
+# matched as whole words: पूर is also the start of पूरा ("whole"), বান of বানান ("spelling").
+_NATIVE = r"\u0900-\u097F\u0980-\u09FF"
+FLOOD_TERMS = re.compile(unicodedata.normalize("NFC",
+    r"\b(?:flood\w*|inundat\w*|water[-\s]?logg\w*|cloud\s*burst\w*|deluge|heavy\s+rain\w*|"
+    r"glof|glacial\s+lakes?\s+(?:burst\w*|outburst\w*|breach\w*|flood\w*)|lake\s+outburst\w*|"
     r"very\s+heavy|extremely\s+heavy|river\s+(?:level|water|swell\w*|overflow\w*|in\s+spate)|danger\s+level|"
     r"dam\s+(?:shutters?|gates?|release|breach\w*|overflow\w*)|landslide\w*|baadh|baarish|vellapokkam|bonna|bonya)\b"
-    r"|बाढ़|बाढ|जलभराव|भारी\s*(?:वर्षा|बारिश)|अति\s*भारी|बादल\s*फट|മഴ|വെള്ളപ്പൊക്കം|ഉരുൾപൊട്ടൽ|প্লাবন|বন্যা|বান|"
-    r"অতি\s*ভারী|पूर|मुसळधार",
+    r"|बाढ़|जल\s*भराव|जलमग्न|भारी\s*(?:वर्षा|बारिश)|अति\s*भारी|बादल\s*फट|(?:हिमनद|हिमनदी|ग्लेशियर|ग्लेशियल)\s*झील|झील\s*फट|मुसळधार|"
+    rf"(?<![{_NATIVE}])पूर(?![{_NATIVE}])|"
+    r"വെള്ളപ്പൊക്കം|വെള്ളക്കെട്ട്|പ്രളയ|ഉരുൾപൊട്ടൽ|മേഘവിസ്ഫോടന|(?:കനത്ത|ശക്തമായ|അതിതീവ്ര)\s*മഴ|"
+    rf"প্লাবন|বন্যা|জলমগ্ন|জলাবদ্ধ|মেঘভাঙা|অতি\s*ভারী|(?<![{_NATIVE}])বান(?![{_NATIVE}])"),
+    re.IGNORECASE,
+)
+# "flood" that is not about water. Removed before FLOOD_TERMS runs, so a post that also says "flood alert" still passes.
+_FLOOD_VERB = r"flood(?:s|ed|ing)?"
+_NOT_WATER_AFTER = r"(?![-\s]+(?:victims?|relief|affected|hit|waters?|survivors?|camps?|alerts?|warnings?|situation|zones?)\b)"
+NON_FLOOD = re.compile(
+    rf"\b{_FLOOD_VERB}\s+(?:the\s+|our\s+|your\s+|my\s+)?(?:streets?|markets?|zone|inbox\w*|timelines?|feeds?|internet|"
+    r"social\s+media|phone\s+lines?|courts?|stores?|theat(?:er|re)s?|box\s+office)\b"
+    rf"|\b{_FLOOD_VERB}\s+(?:the\s+)?(?!waters?\b)\w+\s+over\b"  # "flood Delhi over voter lists"
+    r"|\b(?:a|the)\s+flood\s+of\s+(?:\w+\s+){0,2}(?:tweets?|messages?|calls?|e?mails?|complaints?|comments?|letters?|"
+    r"orders?|applications?|memes?|posts?|requests?|reactions?|wishes|tributes?|emotions?|memories|tears|misinformation|"
+    r"lawsuits?|cash|money|imports?)\b"
+    r"|\bthen\s+a\s+flood\b"  # "a trickle, then a river, then a flood"
+    r"|\b(?:thousands|hundreds|lakhs|crowds?|protest\w*|supporters|fans|tourists|devotees|farmers|workers|students|voters|"
+    rf"people|commuters|shoppers)\s+(?:of\s+\w+\s+)?{_FLOOD_VERB}\b{_NOT_WATER_AFTER}"
+    r"|\bflooded\s+with\s+(?:\w+\s+)?(?:orders?|calls?|messages?|e?mails?|complaints?|requests?|applications?|tweets?|"
+    r"offers?|wishes|love|support)\b"
+    r"|\bflood\s*-?lights?\b|\bflood\s*-?lit\b",
     re.IGNORECASE,
 )
 SACHET_KEEP = re.compile(r"flood|inundat|heavy\s+rain|rainfall|river|dam\b|cloud\s*burst|water\s*level|बाढ़|भारी", re.I)
@@ -156,6 +180,8 @@ class LiveItem:
 
 
 def is_flood_related(text: str) -> bool:
+    """Prefilter for news and social posts: a flood term left after removing non-flood uses of "flood"."""
+    text = NON_FLOOD.sub(" ", unicodedata.normalize("NFC", text))
     return bool(FLOOD_TERMS.search(text or ""))
 
 
@@ -289,7 +315,8 @@ def poll_news(fetch: PoliteFetcher, queries=GDELT_QUERIES, retry_waits=GDELT_RET
 
 
 # ---------------------------------------------------------------- Bluesky
-BSKY_QUERIES = ("flood kerala", "flood india", "flood assam", "बाढ़", "വെള്ളപ്പൊക്കം")
+BSKY_QUERIES = ("flood kerala", "flood india", "flood assam", "बाढ़", "വെള്ളപ്പൊക്കം", "glacial lake outburst", "cloudburst india",
+                "waterlogging india", "inundation india", "जलभराव", "बादल फटना", "വെള്ളക്കെട്ട്")
 
 
 class BlueskyClient:
@@ -321,14 +348,23 @@ class BlueskyClient:
         return json.loads(raw).get("posts", [])
 
 
+def _bsky_id(uri: str) -> str:
+    """Stable id for de-duplication; hashed so the account's DID is not shown as the post id."""
+    return "bluesky:" + hashlib.sha256(uri.encode()).hexdigest()[:16]
+
+
+def _bsky_url(uri: str) -> str:
+    """at://<did>/app.bsky.feed.post/<rkey> -> web link by DID, so no handle appears in the link text."""
+    did, _, rkey = uri.removeprefix("at://").split("/")
+    return f"https://bsky.app/profile/{did}/post/{rkey}"
+
+
 def parse_bsky_post(p: dict) -> LiveItem:
+    """Text, time and link only: no handle or display name is kept. The link and id come from the at:// post URI."""
     rec = p.get("record", {})
-    handle = p.get("author", {}).get("handle", "")
-    rkey = p["uri"].rsplit("/", 1)[-1]
     created = datetime.fromisoformat(rec.get("createdAt", p.get("indexedAt")).replace("Z", "+00:00"))
-    return LiveItem(id=f"bluesky:{p['uri']}", source="bluesky", kind="social", text=rec.get("text", ""),
-                    url=f"https://bsky.app/profile/{handle}/post/{rkey}", published_at=_utc(created),
-                    lang=(rec.get("langs") or [None])[0], author=handle)
+    return LiveItem(id=_bsky_id(p["uri"]), source="bluesky", kind="social", text=rec.get("text", ""),
+                    url=_bsky_url(p["uri"]), published_at=_utc(created), lang=(rec.get("langs") or [None])[0])
 
 
 def poll_bluesky(client: BlueskyClient, now: datetime, queries=BSKY_QUERIES) -> list[LiveItem]:
@@ -361,6 +397,20 @@ class LiveStore:
             for col, typ in (("duration", "REAL"), ("note", "TEXT")):  # databases created before these columns
                 if col not in cols:
                     c.execute(f"ALTER TABLE source_status ADD COLUMN {col} {typ}")
+        self._scrub_bluesky_authors()
+
+    def _scrub_bluesky_authors(self) -> None:
+        """Databases written before handles were dropped: remove them from every Bluesky row."""
+        with self._conn() as c:
+            rows = c.execute("SELECT id FROM items WHERE source='bluesky' AND id LIKE 'bluesky:at://%'").fetchall()
+            for r in rows:
+                uri = r["id"].removeprefix("bluesky:")
+                c.execute("UPDATE items SET id=?, url=?, author=NULL WHERE id=?", (_bsky_id(uri), _bsky_url(uri), r["id"]))
+            c.execute("UPDATE items SET author=NULL WHERE source='bluesky'")
+        if rows:
+            vacuum = sqlite3.connect(self.path, timeout=30)  # freed pages would still hold the old handles
+            vacuum.execute("VACUUM")
+            vacuum.close()
 
     def _conn(self) -> sqlite3.Connection:
         c = sqlite3.connect(self.path, timeout=30)

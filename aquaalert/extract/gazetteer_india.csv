@@ -1,0 +1,369 @@
+name,lat,lon,district,state,kind,wikidata,case_sensitive,aliases
+agra,27.18,78.02,Agra,Uttar Pradesh,town,Q42941,0,आगरा|আগ্রা
+aligarh,27.88,78.08,Aligarh,Uttar Pradesh,town,Q201832,0,अलीगढ़|আলিগড়
+alipore,22.5265,88.3324,South 24 Parganas,West Bengal,town,Q2341786,0,अलीपुर|আলিপুর
+alipurduar,26.5,89.52,Alipurduar,West Bengal,town,Q548210,0,अलिपुरद्वार|अलीपुर द्वार|আলিপুরদুয়ার
+allahabad,25.45,81.85,Prayagraj,Uttar Pradesh,town,Q162442,0,
+ambedkar nagar,26.43,82.64,Ambedkar Nagar,Uttar Pradesh,district,Q456764,0,आंबेडकर नगर|আম্বেদকর নগর
+amethi,26.1689,81.7994,Amethi,Uttar Pradesh,district,Q1071494,0,छत्रपति शाहूजी महाराज नगर|আমেঠি
+amroha,28.9044,78.4675,Amroha,Uttar Pradesh,town,Q584515,0,अमरोहा|আমরোহা
+angul,20.7972,85.0239,Angul,Odisha,town,Q518237,0,अनुगुल|অনুগুল
+ara,25.5631,84.6711,Bhojpur,Bihar,town,Q588587,1,
+arambagh,22.88,87.78,Hooghly,West Bengal,town,Q582917,0,आरामबाग़|আরামবাগ
+araria,26.1346,87.4654,Araria,Bihar,town,Q4660870,0,अररिया|আরারিয়া
+arrah,25.5631,84.6711,Bhojpur,Bihar,town,Q588587,0,
+arwal,25.25,84.68,Arwal,Bihar,town,Q957719,1,अरवल|আরোয়াল
+asansol,23.6833,86.9667,Paschim Bardhaman,West Bengal,town,Q202139,0,आसनसोल|আসানসোল
+ashokenagar kalyangarh,22.833,88.633,North 24 Parganas,West Bengal,town,Q583568,0,अशोकनगर कल्याणगढ़|অশোকনগর কল্যাণগড়
+auraiya,26.4631,79.5117,Auraiya,Uttar Pradesh,town,Q582908,0,औरया|औरैया|ঔরিয়া
+ayodhya,26.7992,82.2044,Ayodhya,Uttar Pradesh,town,Q186040,0,अयोध्या|অযোধ্যা
+azamgarh,26.06,83.19,Azamgarh,Uttar Pradesh,town,Q526757,0,आजमगढ़|আজমগড়
+bagaha,27.125,84.065,West Champaran,Bihar,town,Q590593,0,बगहा|বাগাহা
+baghpat,28.95,77.22,Bagpat,Uttar Pradesh,town,Q624402,0,বাঘপাত
+bagmati,26.229,85.6376,,,river,Q4461769,0,बागमती|বাগমতী
+bagpat,28.94,77.22,Bagpat,Uttar Pradesh,district,Q1797363,0,बागपत|বাগপথ
+baheri,28.94,79.5,Bareilly,Uttar Pradesh,town,Q625710,0,बहेड़ी|বাহেরি
+bahjoi,28.393,78.623,Sambhal,Uttar Pradesh,town,Q632831,0,बहज़ोई
+bahraich,27.5742,81.5958,Bahraich,Uttar Pradesh,town,Q638621,0,बहराइच|বাহরাইচ
+baidyabati,22.79,88.32,Hooghly,West Bengal,town,Q625394,0,बैद्यबाटी|বৈদ্যবাটী
+baitarani,20.75,86.8,,,river,Q3773157,0,बैतरणी|বৈতরণী
+baksa,26.698,91.1514,Baksa,Assam,district,Q2360266,0,বাক্সা
+balangir,20.7167,83.4833,Balangir,Odisha,town,Q632816,0,बलांगिर|বলাঙ্গির
+balasore,21.5033,86.925,Balasore,Odisha,town,Q641098,0,बालेश्वर|বালেশ্বর
+ballia,25.7625,84.1519,Ballia,Uttar Pradesh,town,Q7180187,0,बलिया|বালিয়া|বাল্যিয়া
+bally,22.6294,88.3481,Howrah,West Bengal,town,Q3633473,1,
+balrampur,27.4295,82.1855,Balrampur,Uttar Pradesh,town,Q612328,0,बलरामपुर|বলরামপুর
+balurghat,25.2167,88.7667,West Dinajpur,West Bengal,town,Q633291,0,बालुरघाट|বালুরঘাট
+banaras,25.3189,83.0128,Varanasi,Uttar Pradesh,town,Q79980,0,
+banda,25.4833,80.3333,Banda,Uttar Pradesh,town,Q2575623,1,
+bandel,22.9228,88.3794,Hooghly,West Bengal,town,Q629006,0,बण्डेल|ব্যান্ডেল
+bangaon,23.0435,88.8318,Ichamati,West Bengal,town,Q622612,0,बनगाँव|বনগাঁ
+banka,24.8829,86.919,Banka,Bihar,district,Q43097,1,
+bankra,22.63,88.3,Howrah,West Bengal,town,Q637079,0,बाँकड़ा|বাঁকড়া
+bankura,23.25,87.0667,Bankura,West Bengal,town,Q1949030,0,बाँकुड़ा|बांकुड़ा|বাঁকুড়া
+bansberia,22.97,88.4,Hooghly,West Bengal,town,Q622607,0,बांसबेरिया|বাঁশবেড়িয়া
+barabanki,26.92,81.2,Barabanki,Uttar Pradesh,town,Q3780142,0,बाराबंकी|बाराबांकी|বারাবংকী|বারোবাঁকী
+barak,24.8761,92.4892,,,river,Q1709169,1,बराक|বরাক
+baranagar,22.64,88.37,North 24 Parganas,West Bengal,town,Q712504,0,बरानगर|বরাহনগর
+barasat,22.7191,88.4826,North 24 Parganas,West Bengal,town,Q685315,0,बारासत|বারাসত
+barbil,22.1119,85.3869,Kendujhar,Odisha,town,Q708828,0,बड़बिल|বারবিল
+bardhaman,23.25,87.85,Bardhaman,West Bengal,town,Q709267,0,बर्धमान|বর্ধমান
+bareilly,28.364,79.415,Bareilly,Uttar Pradesh,town,Q213026,0,बरेली|বরেলী|বেরেলি
+bargarh,21.3333,83.6167,Bargarh,Odisha,town,Q712361,0,बरगड़|बरगढ़|বড়গড়
+baripada,21.935,86.7214,Mayurbhanj,Odisha,town,Q712356,0,बारिपदा|বারিপদা
+barpeta,26.32,91.0,Barpeta,Assam,town,Q4128071,0,बारपेटा|বড়পেটা
+barrackpore,22.7642,88.3776,North 24 Parganas,West Bengal,town,Q709298,0,बैरकपुर|ব্যারাকপুর
+basirhat,22.6612,88.866,Basirhat,West Bengal,town,Q712515,0,बसीरहाट|বসিরহাট
+basti,26.7944,82.7328,Basti,Uttar Pradesh,town,Q2574579,1,
+begusarai,25.42,86.13,Begusarai,Bihar,town,Q598985,0,बेगूसराय|বেগুসরাই|বেগুসারাই
+benares,25.3189,83.0128,Varanasi,Uttar Pradesh,town,Q79980,0,
+berhampore,24.1,88.25,Berhampore,West Bengal,town,Q633530,0,बहरामपुर|বহরমপুর
+bettiah,26.8022,84.4986,West Champaran,Bihar,town,Q759222,0,बेतिया|বেতিয়া
+bhabua,25.05,83.62,Kaimur,Bihar,town,Q759544,0,भभुआ|ভাবুয়া
+bhadohi,25.3579,82.4308,Bhadohi,Uttar Pradesh,district,Q127533,0,भदोही|ভাদোহী
+bhadrak,21.0528,86.52,Bhadrak,Odisha,town,Q759556,0,भद्रक|ভদ্রক
+bhadreswar,22.82,88.35,Hooghly,West Bengal,town,Q2453308,0,भद्रेश्वर|ভদ্রেশ্বর
+bhagalpur,25.2444,86.9719,Bhagalpur,Bihar,town,Q760714,0,भागलपुर|ভাগলপুর
+bhatpara,22.8664,88.4011,North 24 Parganas,West Bengal,town,Q854914,0,भाटपाड़ा|ভাটপাড়া
+bhawanipatna,19.9,83.1667,Kalahandi,Odisha,town,Q759348,0,भवानीपटना|ভবানীপাটনা
+bhinga,27.7033,81.9342,Shravasti,Uttar Pradesh,town,Q795811,0,भिनगा|ভিঙ্গা
+bhiti,26.48,82.3008,Ambedkar Nagar,Uttar Pradesh,town,Q131659113,1,भीटी
+bhojpur,25.5562,84.6653,Bhojpur,Bihar,district,Q49153,0,भोजपुर|ভোজপুর
+bhubaneswar,20.295,85.825,Khordha,Odisha,town,Q171771,0,भुवनेश्वर|ভুবনেশ্বর
+bhuragaon,26.4043,92.2338,Morigaon,Assam,town,Q30675461,0,भूरागाँव|ভুরাগাঁও
+bidhannagar,22.58,88.42,North 24 Parganas,West Bengal,town,Q796739,0,बिधाननगर|বিধাননগর
+bihar sharif,25.2,85.52,Nalanda,Bihar,town,Q2308343,0,बिहारशरीफ|বিহার শরীফ
+bijnor,29.37,78.13,Bijnor,Uttar Pradesh,town,Q796664,0,बिजनौर|বিজনোর
+binnaguri,26.46,89.2,Jalpaiguri,West Bengal,town,Q4914428,0,बिन्नागुरि|বিন্নাগুরি
+birbhum,23.91,87.527,Birbhum,West Bengal,district,Q2088440,0,बीरभूम|বীরভূম
+bishnupur,23.0739,87.32,Bishnupur,West Bengal,town,Q533087,0,विष्णुपुर|বিষ্ণুপুর
+bishwanath,26.7278,93.1517,Bishwanath,Assam,district,Q22079836,0,बिश्वनाथ|বিশ্বনাথ
+biswanath chariali,26.7278,93.1517,Bishwanath,Assam,town,Q859133,0,विश्वनाथ चारिआलि|বিশ্বনাথ চারিআলি
+bodh gaya,24.695,84.9925,Gaya,Bihar,town,Q176767,0,बोधगया|বুদ্ধ গয়া
+bongaigaon,26.48,90.56,Bongaigaon,Assam,town,Q3429538,0,बोंगाइगांव|বঙাইগাঁও|বঙ্গাইগাঁও
+boudh,20.8333,84.3167,Boudh,Odisha,town,Q303761,0,बौधगढ़|বৌধগড়
+brahmani,22.2458,84.7839,,,river,Q2639171,0,ब्राह्मणी|ব্রাহ্মণী
+brahmapur,19.32,84.78,Ganjam,Odisha,town,Q860210,0,ब्रह्मपुर|ব্রহ্মপুর
+brahmaputra,26.2007,91.7468,,,river,Q45403,0,ब्रह्मपुत्र|ব্রহ্মপুত্র
+budaun,28.05,79.12,Budaun,Uttar Pradesh,town,Q798839,0,बदायूँ|বদায়ূঁ|বুদাউন
+bulandshahr,28.4069,77.8497,Bulandshahr,Uttar Pradesh,town,Q861248,0,बुलन्द|बुलन्दशहर|বুলন্দ|বুলন্দশহর
+burdwan,23.25,87.85,Bardhaman,West Bengal,town,Q709267,0,
+burhi gandak,25.4339,86.6069,,,river,Q3630468,0,बूढ़ी गण्डक
+buxar,25.5605,83.9805,Buxar,Bihar,town,Q861160,0,बक्सर|বক্সার
+cachar,25.0833,92.9167,Cachar,Assam,district,Q42209,0,काछाड़|কাছাড়
+calcutta,22.5675,88.37,Kolkata,West Bengal,town,Q1348,0,
+chakdaha,23.08,88.52,Nadia,West Bengal,town,Q857581,0,चाकदहा|চাকদহ
+champdani,22.8,88.37,Hooghly,West Bengal,town,Q857746,0,चाम्पदानी|চাঁপদানি
+chandannagar,22.8671,88.3674,Hooghly,West Bengal,town,Q695591,0,चंदननगर|চন্দননগর
+chandauli,25.2569,83.2678,Chandauli,Uttar Pradesh,town,Q2733368,0,चन्दौली|চন্ডাউলি|চান্দৌলি
+charaideo,27.07,95.03,Charaideo,Assam,district,Q24039029,0,चराईदेव|চড়াইদেও
+chhapra,25.7808,84.7308,Saran,Bihar,town,Q1755440,0,छपरा|ছাপরা
+chhatrapur,19.35,84.9833,Ganjam,Odisha,town,Q656584,0,छत्रपुर|ছাত্রাপুর
+chinsurah,22.8956,88.4025,Hooghly,West Bengal,town,Q1006256,0,चुंचुड़ा|চুঁচুড়া
+chirang,26.5238,90.4838,Chirang,Assam,district,Q2574898,0,चिरांग|চিরাং
+chitrakoot,25.2136,80.9153,Chitrakoot,Uttar Pradesh,district,Q2089141,0,चित्रकूट|চিত্রকূট
+chitrakoot dham,25.2,80.9,Chitrakoot,Uttar Pradesh,town,Q2341590,0,चित्रकूट धाम|কারবি
+cooch behar,26.3167,89.4333,Cooch Behar,West Bengal,town,Q313640,0,कूच बिहार|कूचबिहार|কোচবিহার
+cuttack,20.45,85.8667,Cuttack,Odisha,town,Q207324,0,
+dabgram,26.6961,88.4571,Jalpaiguri,West Bengal,town,Q5207471,0,डाबग्राम|ডাবগ্রাম
+dakshin dinajpur,25.22,88.76,Dakshin Dinajpur,West Bengal,district,Q533839,0,दक्षिण दिनाजपुर|দক্ষিণ দিনাজপুর
+damodar,22.2833,88.0833,,,river,Q1971511,0,दामोदर|দামোদর
+danapur,25.6333,85.05,Patna,Bihar,town,Q1022305,0,दानापुर|দানাপুর
+dankuni,22.6854,88.2922,Hooghly,West Bengal,town,Q5219966,0,डानकुनी|ডানকুনি
+darbhanga,26.157,85.8995,Darbhanga,Bihar,town,Q1136189,0,दरभंगा|দ্বারভাঙ্গা
+darjeeling,27.0375,88.2631,Darjeeling,West Bengal,town,Q169997,0,दार्जिलिंग|दार्जीलिंग|দার্জিলিং
+darrang,26.75,92.5,Darrang,Assam,district,Q42461,0,
+debagarh,21.53,84.73,Debagarh,Odisha,town,Q1193197,0,देवगड़|देवगढ़|দেবগড়
+deoria,26.5017,83.7792,Deoria,Uttar Pradesh,town,Q1023685,0,देवरिया|দিওরিয়া|দেওরিয়া
+dhansiri,26.6667,93.75,,,river,Q1755951,0,धनसीरी|ধনশিরি
+dhemaji,27.48,94.58,Dhemaji,Assam,town,Q1264822,0,धेमाजी|ধেমাজি
+dhenkanal,20.6667,85.6,Dhenkanal,Odisha,town,Q1931717,0,ढेंकनाल|ढेन्कानाल|ঢেঙ্কানাল
+dhubri,26.02,90.0,Dhubri,Assam,town,Q1266586,0,धुबरी|ধুবড়ী
+dibrugarh,27.4833,94.9,Dibrugarh,Assam,town,Q1266637,0,डिब्रूगढ|डिब्रूगढ़|ডিব্রুগড়
+dima hasao,25.18,93.03,Dima Hasao,Assam,district,Q42774,0,उत्तर कछर|ডিমা হাসাও
+diphu,25.8333,93.4333,Karbi Anglong,Assam,town,Q1227167,0,दीफू|ডিফু
+dispur,26.15,91.77,Kamrup Metropolitan,Assam,town,Q271911,0,दिसपुर|দিসপুর
+dum dum,22.6333,88.4228,North 24 Parganas,West Bengal,town,Q649955,0,दम दम|দমদম
+durgapur,23.55,87.32,Paschim Bardhaman,West Bengal,town,Q5088,0,दुर्गापुर|দুর্গাপুর
+east champaran,26.5833,84.8333,East Champaran,Bihar,district,Q49159,0,पूर्वी चंपारण|পূর্ব চম্পারণ
+etah,27.63,78.67,Etah,Uttar Pradesh,town,Q1525330,1,এতাহ
+etawah,26.77,79.03,Etawah,Uttar Pradesh,town,Q878237,0,इटावा|ইটাওয়া
+faizabad,26.7833,82.1333,Ayodhya,Uttar Pradesh,town,Q842411,0,फ़ैज़ाबाद
+farrukhabad,27.3914,79.5792,Farrukhabad,Uttar Pradesh,town,Q4549,0,फ़र्रूख़ाबाद|ফারুখাবাদ
+fatehgarh,27.37,79.63,Farrukhabad,Uttar Pradesh,town,Q1023671,0,फ़तेहगढ़|ফতেহগড়
+fatehpur,25.93,80.8,Fatehpur,Uttar Pradesh,town,Q1525461,0,फतेहपुर|ফতেপুর|ফতেহপুর
+firozabad,27.15,78.42,Firozabad,Uttar Pradesh,town,Q1452991,0,फ़िरोज़ाबाद|ফিরোজাবাদ
+gajapati,18.88,84.2,Gajapati,Odisha,district,Q1947292,0,गजपति|গজপতি
+gandak,25.656,85.1781,,,river,Q18340305,0,
+ganga,,,,,river,Q5089,0,गंगा|গঙ্গা
+ganges,,,,,river,Q5089,0,
+ganjam,19.5,84.5,Ganjam,Odisha,district,Q776213,0,गंजाम|গঞ্জাম
+garulia,22.82,88.37,North 24 Parganas,West Bengal,town,Q515118,0,गारुलिया|গারুলিয়া
+gauhati,26.1806,91.7502,Kamrup,Assam,town,Q199605,0,
+gautam buddh nagar,28.5333,77.3891,Gautam Buddh Nagar,Uttar Pradesh,district,Q1785950,0,गौतम बुद्ध नगर|গৌতম বুদ্ধ নগর
+gaya,24.75,85.0167,Gaya,Bihar,town,Q251329,1,
+ghaghara,25.7669,84.6576,,,river,Q390232,0,घाघरा|কর্ণালী
+ghaziabad,28.6667,77.4167,Ghaziabad,Uttar Pradesh,town,Q207098,0,गाज़ियाबाद|গাজিয়াবাদ
+ghazipur,25.5833,83.5667,Ghazipur,Uttar Pradesh,town,Q1006321,0,ग़ाज़ीपुर|गाजीपुर|গাজীপুর
+goalpara,26.17,90.62,Goalpara,Assam,town,Q579832,0,गोवालपारा|ग्वालपाड़ा|গোয়ালপাড়া
+golaghat,26.5239,93.9623,Golaghat,Assam,town,Q1708160,0,गोलाघाट|গোলাঘাট
+gomti,25.6526,82.8022,,,river,Q477676,0,गोमती|গোমতী
+gonda,27.1333,81.9333,Gonda,Uttar Pradesh,town,Q2428556,1,गोंडा|गोण्डा|গোণ্ডা|গোন্ডা
+gopalganj,26.47,84.43,Gopalganj,Bihar,town,Q720133,0,गोपालगंज|গোপালগঞ্জ
+gorakhpur,26.7611,83.3667,Gorakhpur,Uttar Pradesh,town,Q5584396,0,गोरखपुर|গোরক্ষপুর
+greater noida,28.4962,77.536,Gautam Buddh Nagar,Uttar Pradesh,town,Q2711899,0,ग्रेटर नोएडा|বৃহত্তর নয়ডা
+guwahati,26.1806,91.7502,Kamrup,Assam,town,Q199605,0,गुवाहाटी|গুয়াহাটি
+gyanpur,25.3335,82.4651,Bhadohi,Uttar Pradesh,town,Q1557962,0,ज्ञानपुर|জ্ঞানপুর
+habra,22.83,88.63,North 24 Parganas,West Bengal,town,Q1708439,0,हाबरा|হাবড়া
+haflong,25.18,93.03,Dima Hasao,Assam,town,Q1026900,0,हाफलांग|হাফলং
+hailakandi,24.68,92.57,Hailakandi,Assam,town,Q914156,0,हाईलाकांदी|हैलाकन्दी जिल्ला|হাইলাকান্দি
+haldia,22.03,88.06,Purba Medinipur,West Bengal,town,Q12460009,0,हल्दिया|হলদিয়া
+halisahar,22.95,88.42,North 24 Parganas,West Bengal,town,Q1707695,0,হালিসহর
+hamirpur,25.95,80.15,Hamirpur,Uttar Pradesh,town,Q2737448,0,हमीरपुर|হামিরপুর
+hamren,25.8453,92.5746,West Karbi Anglong,Assam,town,Q1707349,0,हामरेन|হামরেণ
+hapur,28.73,77.7755,Hapur,Uttar Pradesh,town,Q11139912,1,हापुड़|হাপুড়|হাপুর
+hardoi,27.3947,80.1283,Hardoi,Uttar Pradesh,town,Q1708143,0,हरदोई|হরদোই|হারদোই
+hathras,27.36,78.03,Hathras,Uttar Pradesh,town,Q1709695,0,हाथरस|হাতরস|হাথরস
+hatsingimari,25.68,89.98,South Salmara-Mankachar,Assam,town,Q15223300,0,हाटशिंगिमारी|হাটশিঙ্গিমারী
+hojai,26.0028,92.8528,Hojai,Assam,town,Q640538,0,होजई|होजाई|হোজাই
+hooghly,22.9,88.39,Hooghly,West Bengal,district,Q548518,0,हुगली|হুগলি
+hooghly river,23.4092,88.3786,,,river,Q739687,0,হুগলী
+howrah,22.58,88.3294,Howrah,West Bengal,town,Q205697,0,हावड़ा|হাওড়া
+hugli-chuchura,22.9089,88.3967,Hooghly,West Bengal,town,Q20099772,0,हुगली-चुचुरा|হুগলি-চুঁচুড়া
+ichamati,23.0433,88.8317,Ichamati,West Bengal,district,Q113377166,0,ইছামতী
+jagatsinghpur,20.2667,86.1667,Jagatsinghpur,Odisha,town,Q2670444,0,जगतसिंहपुर|জগৎসিংহপুর
+jajpur,20.85,86.3333,Jajpur,Odisha,town,Q2008623,0,जाजपुर|যাজপুর
+jalaun,26.0,79.5,Jalaun,Uttar Pradesh,district,Q2089115,0,जालौन|জালৌন
+jaldhaka,27.0297,88.8747,,,river,Q6126710,0,जलढाका|জলঢাকা
+jalpaiguri,26.5167,88.7333,Jalpaiguri,West Bengal,town,Q1949125,0,जलपाईगुड़ी|জলপাইগুড়ি
+jamui,24.92,86.22,Jamui,Bihar,town,Q385987,1,जमुई|জমুই|জামুই
+jamuria,23.7,87.08,Paschim Bardhaman,West Bengal,town,Q2286850,0,जामुरिया|জামুরিয়া
+jangipur,24.4561,88.1072,Jangipur,West Bengal,town,Q2576052,0,जांगीपुर|জঙ্গীপুর
+jatani,20.17,85.7,Khordha,Odisha,town,Q2352196,0,जटनी|জাতানি
+jaunpur,25.7536,82.6869,Jaunpur,Uttar Pradesh,town,Q1025475,0,जौनपुर|জৌনপুর
+jehanabad,25.2136,84.9872,Jehanabad,Bihar,town,Q1948999,0,जहानाबाद|জেহানাবাদ
+jhansi,25.4486,78.5696,Jhansi,Uttar Pradesh,town,Q242995,0,झाँसी|झांसी|ঝাঁসি
+jhargram,22.45,86.98,Jhargram,West Bengal,town,Q2287060,0,झाड़ग्राम|ঝাড়গ্রাম
+jharsuguda,21.85,84.0333,Jharsuguda,Odisha,town,Q2088489,0,झारसुगुड़ा|झारसुगुडा|ঝারসুগুড়া
+jorhat,26.7575,94.2031,Jorhat,Assam,town,Q1937201,0,जोरहट|যোরহাট
+kaimur,25.0406,83.6124,Kaimur,Bihar,district,Q77367,0,कैमूर|কাইমুর
+kairana,29.4,77.2,Shamli,Uttar Pradesh,town,Q2450872,0,कैराना|কাইরানা
+kajalgaon,26.5139,90.5264,Chirang,Assam,town,Q3812529,0,काजलगाँव
+kalahandi,20.083,83.2,Kalahandi,Odisha,district,Q1876588,0,कलाहान्डी|কালাহাণ্ডি
+kalimpong,27.06,88.47,Kalimpong,West Bengal,town,Q500877,0,कालिंपोंग|कालिम्पोंग|কালিম্পং
+kalyani,22.975,88.4344,Nadia,West Bengal,town,Q2734589,1,कल्याणी|কল্যাণী
+kamarhati,22.67,88.37,North 24 Parganas,West Bengal,town,Q68953,0,कमारहाटी|কামারহাটি
+kamrup,26.3333,91.25,Kamrup,Assam,district,Q2247441,0,कामरूप|কামরূপ
+kamrup metropolitan,26.1833,91.7333,Kamrup Metropolitan,Assam,district,Q2464674,0,कामरूप महानगर|কামরূপ মহানগর
+kanchrapara,22.9456,88.4332,North 24 Parganas,West Bengal,town,Q2088474,0,काँचड़ापाड़ा|কাঁচড়াপাড়া
+kandhamal,20.47,84.23,Kandhamal,Odisha,district,Q2085500,0,कन्धमाल|কন্ধমাল
+kannauj,27.0313,79.922,Kannauj,Uttar Pradesh,town,Q614890,0,कन्नौज|কনৌজ
+kanpur,26.4725,80.3311,Kanpur Nagar,Uttar Pradesh,town,Q66568,0,कानपुर|কানপুর
+kanpur dehat,26.3443,79.9672,Kanpur Dehat,Uttar Pradesh,district,Q610612,0,कानपुर देहात|কানপুর দেহাত
+kanpur nagar,26.46,80.33,Kanpur Nagar,Uttar Pradesh,district,Q2089152,0,কানপুর নগর
+karbi anglong,26.0,93.5,Karbi Anglong,Assam,district,Q29025081,0,कार्बी ऑन्गलॉन्ग|पूर्व कार्बी आंगलोंग|কার্বি আংলং|পূর্ব কার্বি আংলং
+kasganj,27.8077,78.6456,Kasganj,Uttar Pradesh,town,Q2019118,0,कासगंज|কাশগঞ্জ|কাসগঞ্জ
+katihar,25.5385,87.5704,Katihar,Bihar,town,Q172903,0,कटिहार|কাটিহার
+kaushambi,25.5307,81.3773,Kaushambi,Uttar Pradesh,district,Q1946937,0,कौशाम्बी|কৌশাম্বী
+kendrapara,20.5,86.4167,Kendrapara,Odisha,town,Q2082443,0,केन्द्रापड़ा|কেন্দ্রপাড়া
+kendujhar,21.6333,85.5833,Kendujhar,Odisha,town,Q2142272,0,केन्दुझर|কেন্দুঝর
+khagaria,25.5,86.48,Khagaria,Bihar,town,Q2070587,0,खगड़िया|খগড়িয়া
+khalilabad,26.7744,83.0708,Sant Kabir Nagar,Uttar Pradesh,town,Q2483802,0,खलीलाबाद|খলিলাবাদ
+kharagpur,22.3302,87.3237,Paschim Medinipur,West Bengal,town,Q588477,0,खड़गपुर|খড়্গপুর
+khardah,22.72,88.38,North 24 Parganas,West Bengal,town,Q2120110,0,खड़दहा|খড়দহ
+khordha,20.1833,85.6167,Khordha,Odisha,town,Q2241122,0,खुर्दा|खोर्धा|খুরদা
+kishanganj,26.0794,87.9372,Kishanganj,Bihar,town,Q1949375,0,किशनगंज|কিশানগঞ্জ
+kokrajhar,26.4,90.27,Kokrajhar,Assam,town,Q2728994,0,कोकराझाड़|কোকড়াঝাড়|কোকরাজহার
+kolkata,22.5675,88.37,Kolkata,West Bengal,town,Q1348,0,कोलकाता|কলকাতা
+konnagar,22.7,88.35,Hooghly,West Bengal,town,Q2235942,0,कोननगर|কোন্নগর
+koraput,18.8167,82.7167,Koraput,Odisha,town,Q2090260,0,कोरापुट|কোরাপুট
+kosi,25.4045,87.2592,,,river,Q695610,1,कोसी|কোশী
+krishnanagar,23.4,88.5,Nadia,West Bengal,town,Q1006338,0,कृष्णानगर|কৃষ্ণনগর
+kulti,23.73,86.8399,Paschim Bardhaman,West Bengal,town,Q256409,1,कुलटि|কুলটি
+kushinagar,26.9025,83.9819,Kushinagar,Uttar Pradesh,district,Q1840355,0,कुशीनगर|কুশীনগর
+lakhimpur kheri,27.95,80.77,Lakhimpur Kheri,Uttar Pradesh,district,Q1755447,0,लखीमपुर खीरी|লখিমপুর খেরি
+lakhisarai,25.1706,86.1028,Lakhisarai,Bihar,town,Q1929578,0,लक्खिसराय|लखीसराय|লক্ষ্মীসরাই
+lalitpur,24.6903,78.4189,Lalitpur,Uttar Pradesh,town,Q1025286,0,ललितपुर|ললিতপুর
+lucknow,26.847,80.947,Lucknow,Uttar Pradesh,town,Q47916,0,लखनऊ|লক্ষ্ণৌ|লখনউ
+madhepura,25.9144,86.7827,Madhepura,Bihar,town,Q1929621,0,मधेपुरा|মাধেপুরা
+madhubani,26.37,86.08,Madhubani,Bihar,town,Q2767858,0,मधुबनी|মধুবনী
+madhyamgram,22.7,88.45,North 24 Parganas,West Bengal,town,Q2230683,0,मध्यमग्राम|মধ্যমগ্রাম
+mahanadi,20.2953,86.7108,,,river,Q271044,0,মহানদী
+mahananda,24.49,88.3039,,,river,Q2428539,0,महानंदा|মহানন্দা
+maharajganj,27.13,83.57,Maharajganj,Uttar Pradesh,district,Q1356139,0,মহারাজগঞ্জ
+mahasi,27.6397,81.3856,Bahraich,Uttar Pradesh,town,Q20598113,0,महसी
+maheshtala,22.506,88.2502,South 24 Parganas,West Bengal,town,Q1807947,0,महेशतला|মহেশতলা
+mahoba,25.28,79.8729,Mahoba,Uttar Pradesh,town,Q1814470,0,महोबा|মাহোবা
+mahrajganj,27.1442,83.5622,Maharajganj,Uttar Pradesh,town,Q1026177,0,महाराजगंज|মহারাজগংজ
+mainpuri,27.23,79.02,Mainpuri,Uttar Pradesh,town,Q2287173,0,मैनपुरी|মৈনপুরী
+majuli,26.95,94.1667,Majuli,Assam,district,Q28110729,0,माजुली|মাজুলী
+malda,25.0044,88.1458,Malda,West Bengal,town,Q1525057,0,मालदा|মালদহ|মালদা
+malkangiri,18.35,81.9,Malkangiri,Odisha,town,Q2366445,0,मल्कानगिरि|मालकानगिरि|মালকানগিরি
+manas,26.217,90.633,,,river,Q2015702,1,
+mangaldoi,26.43,92.03,Darrang,Assam,town,Q2308247,0,मंगलदोई|মঙ্গলদৈ
+manjhanpur,25.5306,81.3767,Kaushambi,Uttar Pradesh,town,Q2333431,0,मंझनपुर|মনজাহানপুর
+mathura,27.4924,77.6737,Mathura,Uttar Pradesh,town,Q200311,0,मथुरा|মথুরা
+mau,25.9417,83.5611,Mau,Uttar Pradesh,town,Q493091,1,
+mayurbhanj,21.933,86.733,Mayurbhanj,Odisha,district,Q1914546,0,मयूरभंज|ময়ূরভঞ্জ
+medinipur,22.4333,87.3333,Paschim Medinipur,West Bengal,town,Q12447537,0,मेदिनीपुर|মেদিনীপুর
+meerut,28.98,77.7064,Meerut,Uttar Pradesh,town,Q200237,0,मेरठ|মীরাট|মেরাঠ
+mirzapur,25.1507,82.5648,Mirzapur,Uttar Pradesh,district,Q1143894,0,मिर्ज़ापुर|মির্জাপুর
+mirzapur-cum-vindhyachal,25.145,82.5653,Mirzapur,Uttar Pradesh,town,Q888908,0,
+modinagar,28.911,77.6348,Ghaziabad,Uttar Pradesh,town,Q2451005,0,मोदीनगर
+moradabad,28.8432,78.7287,Moradabad,Uttar Pradesh,town,Q330643,0,मुरादाबाद|মোরাদাবাদ
+morigaon,26.2533,92.3424,Morigaon,Assam,town,Q2484039,0,मरिगाँव|मारिगांव|মরিগাঁও
+motihari,26.65,84.9167,East Champaran,Bihar,town,Q1774606,0,मोतिहारी|মোতিহারী
+munger,25.381,86.465,Munger,Bihar,town,Q36796,0,मुंगेर|মুঙ্গের
+murshidabad,24.2,88.2667,Murshidabad,West Bengal,district,Q1546240,0,मुर्शिदाबाद|মুর্শিদাবাদ
+mushalpur,26.662,91.3411,Baksa,Assam,town,Q3867471,0,मूशलपुर|মুছলপুর
+muzaffarnagar,29.4675,77.705,Muzaffarnagar,Uttar Pradesh,town,Q2768828,0,मुज़फ़्फ़र नगर|মজঃফরনগর
+muzaffarpur,26.12,85.3833,Muzaffarpur,Bihar,town,Q1453196,0,मुजफ्फरपुर|মজঃফরপুর
+nabadwip,23.4088,88.3657,Nadia,West Bengal,town,Q1006330,0,नवद्वीप|নবদ্বীপ
+nabarangpur,19.2333,82.55,Nabarangpur,Odisha,town,Q2085319,0,नबरंगपुर|নবরঙ্গপুর
+nadia,23.4,88.5,Nadia,West Bengal,district,Q1143880,1,নদিয়া
+nagaon,26.3492,92.6861,,Assam,town,Q11938328,0,नगाँव|নগাঁও
+naihati,22.89,88.42,North 24 Parganas,West Bengal,town,Q68593,0,नैहाटी|নৈহাটি
+nalanda,25.2,85.52,Nalanda,Bihar,district,Q77633,0,नालंदा|নালন্দা
+nalbari,26.42,91.43,Nalbari,Assam,town,Q2573006,0,नलबाड़ी|নলবাড়ী
+nawada,24.88,85.53,Nawada,Bihar,town,Q1929549,0,नवादा|নওয়াদা
+nayagarh,20.13,85.1,Nayagarh,Odisha,town,Q586859,0,नयागड़|नयागढ़|নয়াগড়
+new barrackpore,22.7,88.45,North 24 Parganas,West Bengal,town,Q2563840,0,नया बैरकैपर|নব বারাকপুর
+noida,28.57,77.32,Gautam Buddh Nagar,Uttar Pradesh,town,Q278204,0,नोएडा|নয়ডা
+north 24 parganas,22.7167,88.4833,North 24 Parganas,West Bengal,district,Q338425,0,उत्तर २४ परगना|উত্তর চব্বিশ পরগনা
+north barrackpore,22.7769,88.3459,North 24 Parganas,West Bengal,town,Q2318208,0,उत्तर बैरकपुर|উত্তর ব্যারাকপুর
+north dum dum,22.6521,88.4191,North 24 Parganas,West Bengal,town,Q36752,0,उत्तरी दमदम|উত্তর দমদম
+north lakhimpur,27.2414,94.1056,Lakhimpur,Assam,town,Q2088889,0,उत्तरी लखीमपुर|উত্তর লখিমপুর
+nuapada,20.8167,82.5333,Nuapada,Odisha,town,Q2572984,0,नुआपड़ा|नुआपाड़ा|নুয়াপাড়া|নোয়াপাড়া
+old malda,25.04,88.14,Malda,West Bengal,town,Q2564010,0,पुराना मालदा|পুরনো মালদহ
+orai,25.98,79.47,Jalaun,Uttar Pradesh,town,Q640646,1,
+padrauna,26.9042,83.9808,Kushinagar,Uttar Pradesh,town,Q2341393,0,पडरौना|পাদ্রুনা
+panihati,22.69,88.37,North 24 Parganas,West Bengal,town,Q1801463,0,पानीहाटी|পানিহাটি
+paralakhemundi,18.7833,84.1,Gajapati,Odisha,town,Q2352208,0,पारलाखेमूंदी|পারলাখেমুন্দি
+paschim bardhaman,23.68,86.99,Paschim Bardhaman,West Bengal,district,Q29215602,0,पश्चिम बर्धमान|পশ্চিম বর্ধমান
+paschim medinipur,22.424,87.319,Paschim Medinipur,West Bengal,district,Q1855537,0,पश्चिम मेदिनीपुर|পশ্চিম মেদিনীপুর
+pathsala,26.4994,91.1793,Bajali,Assam,town,Q2571402,0,पाठशाला
+patna,25.61,85.1414,Patna,Bihar,town,Q80484,0,पटना|পাটনা
+phulbani,20.4667,84.2333,Kandhamal,Odisha,town,Q2296037,0,फूलबाणी|ফুলবাণী
+phulia,23.24,88.5,Nadia,West Bengal,town,Q2228775,0,फुलिया|ফুলিয়া
+pilibhit,28.6333,79.7667,Pilibhit,Uttar Pradesh,town,Q1197824,0,पीलभीत|पीलीभीत|পিলিভিত|পিলিভীত
+pratapgarh,25.8956,81.9403,Pratapgarh,Uttar Pradesh,town,Q1027118,0,प्रतापगढ़|প্রতাপগড়|প্রতাপগঢ়
+prayagraj,25.45,81.85,Prayagraj,Uttar Pradesh,town,Q162442,0,प्रयागराज|প্রয়াগরাজ
+purba bardhaman,23.2383,87.8608,Purba Bardhaman,West Bengal,district,Q29257278,0,पूर्व बर्धमान|পূর্ব বর্ধমান
+purba medinipur,22.3,87.92,Purba Medinipur,West Bengal,district,Q1431920,0,पूर्व मेदिनीपुर|পূর্ব মেদিনীপুর
+puri,19.8,85.8167,Puri,Odisha,town,Q207799,1,
+purnia,25.78,87.47,Purnia,Bihar,town,Q1771762,0,पूर्णिया|পূর্ণিয়া
+purulia,23.3333,86.3667,Purulia,West Bengal,town,Q307442,0,पुरुलिया|পুরুলিয়া
+raebareli,26.2338,81.2336,Raebareli,Uttar Pradesh,town,Q1000485,0,रायबरेली|রায়বেরেলি|রায়বেরেলী
+raiganj,25.6167,88.1167,Uttar Dinajpur,West Bengal,town,Q2304045,0,रायगंज|রায়গঞ্জ
+rajarhat gopalpur,22.62,88.44,North 24 Parganas,West Bengal,town,Q247261,0,राजारहाट|রাজারহাট গোপালপুর
+rajpur sonarpur,22.4409,88.4246,South 24 Parganas,West Bengal,town,Q261988,0,राजपुर सोनारपुर|রাজপুর সোনারপুর
+rampur,28.788,79.019,Rampur,Uttar Pradesh,town,Q1487593,0,रामपुर|রামপুর
+rampur mathura,27.3586,81.3186,Sitapur,Uttar Pradesh,town,Q60108954,0,रामपुर मथुरा
+rampurhat,24.17,87.78,Birbhum,West Bengal,town,Q2120473,0,रामपुरहाट|রামপুরহাট
+ranaghat,23.18,88.58,Nadia Dakshin,West Bengal,town,Q2036954,0,राणाघाट|রাণাঘাট
+raniganj,23.6234,87.1143,Paschim Bardhaman,West Bengal,town,Q2287252,0,रानीगंज|রাণীগঞ্জ
+rayagada,19.1667,83.4167,Rayagada,Odisha,town,Q2352184,0,रायगड़|रायगड़ा|রায়গড়া
+rishra,22.71,88.35,Hooghly,West Bengal,town,Q2453443,0,रिषड़ा|রিষড়া
+robertsganj,24.7,83.0667,Sonbhadra,Uttar Pradesh,town,Q1709323,0,राबर्ट्सगंज|রবার্টসগঞ্জ
+rohtas,24.95,84.01,Rohtas,Bihar,district,Q100085,0,रोहतास|রোহতাস
+rourkela,22.2492,84.8828,Sundargarh,Odisha,town,Q1012706,0,राउरकेला|রৌরকেল্লা
+rupnarayan,22.2167,88.05,,,river,Q7380422,0,रूपनारायण|রূপনারায়ণ
+saharanpur,29.964,77.546,Saharanpur,Uttar Pradesh,town,Q242895,0,सहारनपुर|সাহারানপুর
+saharsa,25.88,86.6,Saharsa,Bihar,town,Q1949422,0,सहरसा|সহর্সা
+samastipur,25.85,85.7667,Samastipur,Bihar,town,Q1925191,0,समस्तीपुर|সমস্তিপুর
+sambalpur,21.45,83.9667,Sambalpur,Odisha,town,Q876483,0,संबलपुर|सम्बलपुर|সম্বলপুর
+sambhal,28.5852,78.5709,Sambhal,Uttar Pradesh,town,Q247248,1,সম্ভল|সাম্বাল
+sankosh,25.9886,89.843,,,river,Q629894,0,संकोश|সংকোশ
+sant kabir nagar,26.78,83.06,Sant Kabir Nagar,Uttar Pradesh,district,Q1945445,0,संत कबीर नगर|সন্ত কবীর নগর
+santipur,23.25,88.43,Nadia,West Bengal,town,Q2035284,0,शांतिपुर|শান্তিপুর
+saran,25.9167,84.75,Saran,Bihar,district,Q100146,1,सारन|সারন
+sasaram,24.95,84.03,Rohtas,Bihar,town,Q1949410,0,सासाराम|সাসারাম
+serampore,22.75,88.34,Hooghly,West Bengal,town,Q1815367,0,श्रीरामपुर|শ্রীরামপুর
+shahjahanpur,27.8775,79.9086,Shahjahanpur,Uttar Pradesh,town,Q2078241,0,शाहजहाँपुर|শাহজাহানপুর
+shamli,29.45,77.32,Shamli,Uttar Pradesh,town,Q2450994,0,शामली|শামলী
+sheikhpura,25.14,85.8408,Sheikhpura,Bihar,town,Q2341756,0,शेखपुरा|শেখপুরা
+sheohar,26.5139,85.2933,Sheohar,Bihar,town,Q2483944,0,शिवहर|শিউহর
+shravasti,27.702,81.9348,Shravasti,Uttar Pradesh,district,Q1945458,0,श्रावस्ती|শ্রাবস্তী
+siddharthnagar,27.258,83.0147,Siddharthnagar,Uttar Pradesh,district,Q1815339,0,सिद्धार्थनगर|সিদ্ধার্থনগর
+silchar,24.8167,92.8,Cachar,Assam,town,Q944769,0,सिलचर|শিলচর
+siliguri,26.72,88.42,Darjeeling,West Bengal,town,Q5087,0,सिलीगुड़ी|শিলিগুড়ি
+sitamarhi,26.6,85.48,Sitamarhi,Bihar,town,Q2360633,0,सीतामढ़ी|সীতামঢ়ী
+sitapur,27.5667,80.6833,Sitapur,Uttar Pradesh,town,Q922701,0,सीतापुर|সীতাপুর
+sivasagar,26.98,94.63,Sivasagar,Assam,town,Q1284453,0,शिवसागर|শিবসাগর
+siwan,26.22,84.36,Siwan,Bihar,town,Q2234098,0,सिवान|सीवान|সিওয়ান
+son river,25.7025,84.865,,,river,Q1418174,1,
+sonari,27.0267,95.0209,Charaideo,Assam,town,Q2737021,1,सोनारी|সোণারি
+sonbhadra,24.6897,83.0653,Sonbhadra,Uttar Pradesh,district,Q607798,0,सोनभद्र|সোনভদ্র
+sonepur,20.8333,83.9167,Subarnapur,Odisha,town,Q1026366,0,सोनपुर|সুবর্ণপুর
+sonitpur,26.63,92.8,Sonitpur,Assam,district,Q42765,0,शोणितपुर|শোণিতপুর
+south 24 parganas,22.5265,88.3324,South 24 Parganas,West Bengal,district,Q2308319,0,दक्षिण २४ परगना|দক্ষিণ চব্বিশ পরগনা
+south dum dum,22.61,88.4,North 24 Parganas,West Bengal,town,Q41538,0,दक्षिण दम दम|দক্ষিণ দমদম
+south salmara-mankachar,25.7715,89.8888,South Salmara-Mankachar,Assam,district,Q24907599,0,दक्षिण सालमारा-मनकाचर|দক্ষিণ শালমারা-মানকাচর
+sribhumi,24.8667,92.3667,Sribhumi,Assam,town,Q1729385,0,करीमगंज|করিমগঞ্জ
+subansiri,26.89,93.9131,,,river,Q1709162,0,सुबनसिरी|সোবণশিরি
+subarnapur,20.9315,83.8249,Subarnapur,Odisha,district,Q1473957,0,
+subarnarekha,21.5674,87.3595,,,river,Q3822918,0,सुवर्णरेखा|সুবর্ণরেখা
+sultanpur,26.2617,82.0717,Sultanpur,Uttar Pradesh,town,Q1021406,0,सुलतानपुर|सुल्तानपुर|সুলতানপুর
+sundarbans,22.175,88.42,Sundarbans,West Bengal,district,Q111967613,0,সুন্দরবন
+sundargarh,22.116,84.016,Sundargarh,Odisha,district,Q2296047,0,सुन्दरगड़
+sundergarh,22.1167,84.0333,Sundargarh,Odisha,town,Q2352156,0,सुंदरगढ|সুন্দরগড়
+supaul,25.93,86.25,Supaul,Bihar,town,Q2341909,0,सुपौल|সুপৌল
+suri,23.9167,87.5333,Birbhum,West Bengal,town,Q2667851,1,सिउड़ी|সিউড়ী
+tamluk,22.3,87.9167,Purba Medinipur,West Bengal,town,Q118278,0,तमलुक|তমলুক
+tamulpur,26.64,91.58,Tamulpur,Assam,district,Q110661970,0,तामूलपुर|তামুলপুর
+teesta,,,,,river,Q907883,0,टिस्टा|তিস্তা
+tezpur,26.62,92.79,Sonitpur,Assam,town,Q1021162,0,तेजपुर|তেজপুর
+tinsukia,27.4892,95.36,Tinsukia,Assam,town,Q2249428,0,तिनसुकिया|তিনসুকিয়া
+titagarh,22.74,88.37,North 24 Parganas,West Bengal,town,Q2287264,0,टीटागढ़|টিটাগড়
+torsa,,,,,river,Q2066287,1,तोर्षा|তোর্ষা
+udalguri,26.7452,92.0962,Udalguri,Assam,town,Q2726152,0,उदलगुड़ी|ओडलगुरी|ওদালগুড়ি
+uluberia,22.47,88.11,Howrah,West Bengal,town,Q2318927,0,उलुबेरिया|উলুবেড়িয়া
+unnao,26.55,80.48,Unnao,Uttar Pradesh,town,Q939610,0,उन्नाव|উননাও|উন্নাও
+uttar dinajpur,25.62,88.12,Uttar Dinajpur,West Bengal,district,Q2019766,0,उत्तर दिनाजपुर|উত্তর দিনাজপুর
+uttarpara kotrung,22.67,88.35,Hooghly,West Bengal,town,Q2317215,0,उत्तरपाड़ा|উত্তরপাড়া কোতরং
+vaishali,25.9866,85.1256,Vaishali,Bihar,town,Q1509463,1,वैशाली|বৈশালী
+varanasi,25.3189,83.0128,Varanasi,Uttar Pradesh,town,Q79980,0,वाराणसी|বারাণসী
+vrindavan,27.5728,77.6933,Mathura,Uttar Pradesh,town,Q688281,0,वृन्दावन|বৃন্দাবন
+west champaran,26.8,84.5,West Champaran,Bihar,district,Q100124,0,पश्चिम चंपारण|পশ্চিম চম্পারণ
+west karbi anglong,26.0,93.5,West Karbi Anglong,Assam,district,Q24949218,0,पश्चिम कार्बी आंगलोंग|পশ্চিম কার্বি আংলং
+yamuna,25.4225,81.8875,,,river,Q132726,0,यमुना|যমুনা

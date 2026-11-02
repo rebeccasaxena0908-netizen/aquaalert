@@ -1,8 +1,16 @@
 import json
+import re
+from datetime import datetime
+from pathlib import Path
 
+import pytest
+
+from aquaalert.extract import gazetteer
 from aquaalert.extract.entities import (extract_locations, extract_people_count, extract_phones,
                                         extract_post)
+from aquaalert.extract.gazetteer import _load_india
 from aquaalert.extract.geocode import Geocoder, in_bbox
+from aquaalert.schemas import Post
 
 
 def test_phones():
@@ -63,3 +71,49 @@ def test_district_and_url(make_post, tmp_path, sample_path):
     f = tmp_path / "u.csv"
     f.write_text("id,text,timestamp,url\n1,hello,2018-08-15 01:00,https://example.org/1\n2,hi,2018-08-15 02:00,\n")
     assert [p.url for p in load_posts(f)] == ["https://example.org/1", None]
+
+
+@pytest.mark.parametrize("text, place, district", [
+    ("Flood waters rising in Guwahati", "Guwahati", "Kamrup"), ("Dhemaji villages under water", "Dhemaji", "Dhemaji"),
+    ("Waterlogging across Bhubaneswar", "Bhubaneswar", "Khordha"), ("Kanpur ghats closed", "Kanpur", "Kanpur Nagar"),
+    ("Heavy rain in Lucknow", "Lucknow", "Lucknow"), ("Patna on alert", "Patna", "Patna"),
+    ("Gandak overflows near Bagaha", "Bagaha", "West Champaran"),
+    ("गुवाहाटी में बाढ़", "Guwahati", "Kamrup"), ("पटना में जलभराव", "Patna", "Patna"), ("भुवनेश्वर में बारिश", "Bhubaneswar", "Khordha"),
+    ("কানপুরে বন্যা", "Kanpur", "Kanpur Nagar"), ("লখনউ শহরে জল", "Lucknow", "Lucknow"),
+])
+def test_other_states_get_pins(tmp_path, text, place, district):
+    post = extract_post(Post(id="x", text=text, timestamp=datetime(2026, 11, 2)), Geocoder(cache_path=tmp_path / "g.json", online=False))
+    assert post.extraction.geo_source == place and post.extraction.geo and post.extraction.district == district
+    assert not in_bbox(post.extraction.geo.lat, post.extraction.geo.lon)  # outside Kerala
+
+
+def test_gazetteer_rows_are_sourced_and_in_range():
+    for row in _load_india(Path(gazetteer.__file__).with_name("gazetteer_india.csv")):
+        assert re.fullmatch(r"Q\d+", row["wikidata"]), row["name"]
+        if row["lat"]:
+            assert 17 < float(row["lat"]) < 31 and 77 < float(row["lon"]) < 97, row["name"]
+        else:
+            assert row["kind"] == "river", row["name"]
+
+
+def test_river_is_a_fallback_pin_and_ganga_has_none(tmp_path):
+    geo = Geocoder(cache_path=tmp_path / "g.json", online=False)
+    make = lambda t: extract_post(Post(id="x", text=t, timestamp=datetime(2026, 11, 2)), geo).extraction  # noqa: E731
+    assert make("Alert along the Sankosh River").geo_source == "Sankosh"
+    assert make("Brahmaputra rising near Dhubri").geo_source == "Dhubri"
+    ganga = make("Ganga above danger mark")
+    assert "Ganga" in ganga.locations and ganga.geo is None
+    assert make("गंगा का जलस्तर बढ़ा").locations == ["Ganga"] and make("Ganges in spate").locations == ["Ganges"]
+
+
+@pytest.mark.parametrize("text", ["paani aa gaya hai", "hum basti mein hain", "sambhal ke rehna", "ye banda kaun hai", "पूरा गया बस्ती में", "संभल कर चलो"])
+def test_everyday_words_are_not_places(text):
+    assert extract_locations(text) == []
+
+
+def test_everyday_word_places_match_when_capitalised():
+    assert extract_locations("Flood in Gaya and Mau") == ["Gaya", "Mau"]
+
+
+def test_same_name_different_state_is_left_out():
+    assert "lakhimpur" not in gazetteer.ALL_PLACES and "lakhimpur kheri" in gazetteer.ALL_PLACES

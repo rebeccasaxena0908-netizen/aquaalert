@@ -1,6 +1,9 @@
+import json
 import re
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 from aquaalert.classify.zeroshot import KeywordZeroShot
@@ -8,8 +11,9 @@ from aquaalert.extract.geocode import Geocoder
 from aquaalert.ingest.loader import load_posts
 from aquaalert.pipeline import process_posts
 from aquaalert.match.matcher import hashing_encoder, match_posts
-from dashboard.helpers import LABEL_COLORS, build_map, build_match_map, jitter, posts_to_frame
-from aquaalert.schemas import LABELS
+from dashboard.helpers import (IRRELEVANT_HIDE_SCORE, LABEL_COLORS, build_map, build_match_map, hidden_as_irrelevant, jitter,
+                               posts_to_frame)
+from aquaalert.schemas import LABELS, Label
 
 APP = Path(__file__).resolve().parent.parent / "dashboard" / "app.py"
 
@@ -263,3 +267,67 @@ def test_live_source_cards_show_state_last_success_and_note(monkeypatch, tmp_pat
     assert not at.exception and states == {"sachet": "slow", "news": "failed", "bluesky": "skipped"}
     assert "last success 16:05 UTC · took 118s" in html and "time budget reached" in html and "HTTP 429" in html
     assert "aa-badge aa-err\">failed" in html and "aa-badge aa-warn\">slow" in html
+
+
+def test_hidden_as_irrelevant_needs_high_confidence(make_post):
+    def labelled(label, score):
+        return make_post("x").model_copy(update={"label": label, "label_score": score})
+
+    assert hidden_as_irrelevant(labelled(Label.IRRELEVANT, IRRELEVANT_HIDE_SCORE))
+    assert not hidden_as_irrelevant(labelled(Label.IRRELEVANT, IRRELEVANT_HIDE_SCORE - 0.01))
+    assert not hidden_as_irrelevant(labelled(Label.INFO_UPDATE, 0.99))
+
+
+class ScriptedClassifier:
+    """Confidently irrelevant for "biryani", unsure for "maybe", otherwise an info update."""
+    name = "scripted"
+
+    def predict_scores(self, texts):
+        def score(t):
+            label, conf = ("irrelevant", 0.95) if "biryani" in t else ("irrelevant", 0.5) if "maybe" in t else ("info_update", 0.9)
+            rest = (1 - conf) / (len(LABELS) - 1)
+            return {l: conf if l == label else rest for l in LABELS}
+        return [score(t) for t in texts]
+
+
+def test_live_mode_hides_confident_irrelevant_but_category_filter_reaches_them(monkeypatch, tmp_path):
+    from aquaalert.ingest.live import LiveItem, LiveStore
+
+    db = live_app(monkeypatch, tmp_path)
+    monkeypatch.setattr("aquaalert.classify.model.get_classifier", lambda *a, **k: ScriptedClassifier())
+    st.cache_resource.clear()  # the cached classifier from earlier tests must not be reused, nor this one leak out
+    st.cache_data.clear()
+    now = datetime.now(timezone.utc)
+    texts = ("Flood alert issued for Patna", "Flood themed biryani night", "maybe a flood somewhere")
+    LiveStore(db).add([LiveItem(id=f"news:{i}", source="news", kind="news", text=t, url="https://x/a",
+                                published_at=now - timedelta(hours=1)) for i, t in enumerate(texts)])
+    try:
+        at = AppTest.from_file(str(APP), default_timeout=120).run()
+        assert not at.exception, at.exception
+        shown = set(at.dataframe[0].value["text"])
+        assert shown == {texts[0], texts[2]}  # the unsure irrelevant post stays on screen
+        assert any("1 live posts hidden" in c.value for c in at.caption)
+        assert kpis(at)["posts"] == 3
+        box = next(m for m in at.sidebar.multiselect if m.label == "Categories")
+        box.set_value([*box.value, "irrelevant"]).run()
+        assert set(at.dataframe[0].value["text"]) == set(texts)
+    finally:
+        st.cache_resource.clear()
+        st.cache_data.clear()
+
+
+def test_nothing_identifying_a_bluesky_account_reaches_the_screen(monkeypatch, tmp_path):
+    from aquaalert.ingest.live import LiveStore, parse_bsky_post
+
+    fixture = json.loads((Path(__file__).parent / "fixtures" / "live" / "bsky_search.json").read_text())
+    db = live_app(monkeypatch, tmp_path)
+    post = fixture["posts"][0]
+    post = {**post, "record": {**post["record"], "createdAt": datetime.now(timezone.utc).isoformat()},
+            "author": {**post["author"], "displayName": "Example Person"}}
+    LiveStore(db).add([parse_bsky_post(post)])
+    at = AppTest.from_file(str(APP), default_timeout=120).run()
+    assert not at.exception, at.exception
+    frame = at.dataframe[0].value
+    shown = page_html(at) + frame.to_csv()
+    assert "resident.example" not in shown and "Example Person" not in shown and "author" not in frame.columns
+    assert "Water entering houses near Aluva" in shown and "/post/3kabc111" in shown

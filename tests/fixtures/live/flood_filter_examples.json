@@ -1,0 +1,71 @@
+{
+ "_comment": "Posts from the 2 Nov 2026 Bluesky search, text only and truncated as printed then (no handles; links shown as <link>). The protest post appeared twice, under two accounts. read=true: the 10 posts read by hand; flood=human judgement. The filter was tuned on these, so the score on them is not an independent measurement.",
+ "posts": [
+  {
+   "read": true,
+   "flood": false,
+   "why": "metaphor",
+   "text": "It won't be instantly (look at India with cricket), but it will happen as a trickle, then a river, then a flood. Because that's what happens with middle class discretiona"
+  },
+  {
+   "read": true,
+   "flood": false,
+   "why": "protest-1",
+   "text": "Thousands Flood Delhi Over Contested Voter Lists: What Is Happening Behind Closed Doors? Full story 👇 Learn more: <link> #EarthInsider #EarthInsiderNews #EINews #IN"
+  },
+  {
+   "read": true,
+   "flood": false,
+   "why": "protest-2",
+   "text": "Thousands Flood Delhi Over Contested Voter Lists: What Is Happening Behind Closed Doors? Full story 👇 Learn more: <link> #EarthInsider #EarthInsiderNews #EINews #IN"
+  },
+  {
+   "read": true,
+   "flood": true,
+   "why": "glof-sankosh",
+   "text": "A Bhutan glacial lake outburst flood has triggered flood alerts and evacuations along the Sankosh River in West Bengal and Assam, India."
+  },
+  {
+   "read": true,
+   "flood": true,
+   "why": "glof-headline",
+   "text": "Bhutan Glacial Lake Outburst Triggers Flash Flood Emergency in India’s Bengal and Assam <link>"
+  },
+  {
+   "read": true,
+   "flood": true,
+   "why": "glof-hindi",
+   "text": "Bhutan Shintafu Lake GLOF Alert: भूटान की शिंताफू झील फटने से भारत में बाढ़ का खतरा, पश्चिम बंगाल और असम में हाई अलर्ट जारी <link>"
+  },
+  {
+   "read": true,
+   "flood": true,
+   "why": "odisha-hindi",
+   "text": "ओडिशा में भारी बारिश का कहर: 11 जिलों में बाढ़ और भूस्खलन से हाहाकार, बचाव में जुटी सेना और ओड्राफ भुवनेश्वर: ओडिशा के 11 जिलों में भारी बारिश का कहर लगातार जारी है, जिसस"
+  },
+  {
+   "read": true,
+   "flood": true,
+   "why": "baitarani-hindi",
+   "text": "वन विभाग की अदूरदर्शिता पानी में बही: बैतरणी नदी की पहली ही बाढ़ में तबाह हुआ लाखों का ‘नेचर कैंप’ प्रोजेक्ट #LALLURAMNEWS #BaitaraniNadi"
+  },
+  {
+   "read": true,
+   "flood": true,
+   "why": "cg-missing-hindi",
+   "text": "CG News : बाढ़ में बहे एक और मछुआरे का शव बरामद, लापता मासूम की तलाश जारी #LALLURAMNEWS #cgnews #Chhattisgarh <link>"
+  },
+  {
+   "read": true,
+   "flood": true,
+   "why": "cg-rain-hindi",
+   "text": "Chhattisgarh Cyclone Alert : छत्तीसगढ़ में 29 अक्टूबर तक भारी बारिश का अलर्ट Chhattisgarh Cyclone Alert बंगाल की खाड़ी में बन रहे चक्रवाती तूफान के प्रभाव से छत्तीसगढ़ के"
+  },
+  {
+   "read": false,
+   "flood": true,
+   "why": "missed-glacial-lake",
+   "text": "Another Himalayan glacial lake bursts Oct 29- Shintaphu among 17 melting glacial regions in Bhutan- World Is One Network from India report w screenshots at Heating Planet"
+  }
+ ]
+}

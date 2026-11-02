@@ -126,11 +126,12 @@ def duplicate_flags(posts: list[Post]) -> dict[str, Flag]:
     for members in groups.values():
         if len(members) < 2:
             continue
-        accounts = len({p.author or p.id for p in members})
+        # live Bluesky posts carry no author, so accounts can't be counted for them
+        by = f" by {len({p.author for p in members})} account(s)" if all(p.author for p in members) else ""
         weight = 0.25 if len(members) >= 3 else 0.15
         for p in members:
             out[p.id] = Flag(code="copy_paste", weight=weight,
-                             reason=f"identical text posted {len(members)} times by {accounts} account(s); "
+                             reason=f"identical text posted {len(members)} times{by}; "
                                     "copy-pasted appeals are often outdated")
     return out
 

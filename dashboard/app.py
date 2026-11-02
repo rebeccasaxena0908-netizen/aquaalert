@@ -13,17 +13,19 @@ from streamlit_folium import st_folium  # noqa: E402
 
 from aquaalert.chatbot.rag import AUDIENCE_LABEL, brief_passages, default_chatbot  # noqa: E402
 from aquaalert.classify.model import get_classifier  # noqa: E402
-from aquaalert.config import get_settings  # noqa: E402
+from aquaalert.config import INDIA_BBOX, get_settings  # noqa: E402
 from aquaalert.extract.geocode import Geocoder  # noqa: E402
 from aquaalert.fuse.sensors import load_sensors  # noqa: E402
 from aquaalert.fuse.warnings import compute_warnings  # noqa: E402
 from aquaalert.ingest.loader import load_many  # noqa: E402
 from aquaalert.match.matcher import default_encoder, match_posts  # noqa: E402
 from aquaalert.pipeline import process_posts  # noqa: E402
+from aquaalert.schemas import Label  # noqa: E402
 from aquaalert.summarize.brief import daily_briefs, latest_per_district  # noqa: E402
 from aquaalert.summarize.providers import TemplateProvider, get_provider  # noqa: E402
 from dashboard import theme as T  # noqa: E402
-from dashboard.helpers import FLAG_THRESHOLD, LABEL_COLORS, build_map, build_match_map, posts_to_frame  # noqa: E402
+from dashboard.helpers import (FLAG_THRESHOLD, IRRELEVANT_HIDE_SCORE, LABEL_COLORS, build_map,  # noqa: E402
+                               build_match_map, hidden_as_irrelevant, posts_to_frame)
 
 st.set_page_config(page_title="AquaAlert", page_icon="🌊", layout="wide")
 
@@ -176,15 +178,26 @@ if mode != "live":
     )
 st.sidebar.caption(f"Classifier: `{_classifier().name}`")
 
+
+
+def category_shown(p) -> bool:
+    """The category filter, except that Live mode keeps irrelevant posts the classifier is unsure about on screen."""
+    if not p.label:
+        return False
+    unsure = mode == "live" and p.label == Label.IRRELEVANT and not hidden_as_irrelevant(p)
+    return p.label.value in labels or unsure
+
+
 visible = [
     p for p in posts
-    if p.timestamp <= replay_at and p.label and p.label.value in labels and (p.label_score or 0) >= min_conf
+    if p.timestamp <= replay_at and category_shown(p) and (p.label_score or 0) >= min_conf
     and (p.language or "und") in lang_pick and credible(p)
 ]
 analysed = [p for p in posts if p.timestamp <= replay_at]
+hidden_irrelevant = [p for p in analysed if hidden_as_irrelevant(p)] if mode == "live" else []
 # Briefs, matching, warnings and the chatbot use everything up to the replay clock (minus hidden low-credibility
-# posts), regardless of the category and language filters.
-so_far = [p for p in analysed if credible(p)]
+# posts), regardless of the category and language filters. Live mode also leaves out confidently irrelevant posts.
+so_far = [p for p in analysed if credible(p) and p not in hidden_irrelevant]
 readings = _sensors()
 replay_day = replay_at.date() if hasattr(replay_at, "date") else replay_at
 warnings = compute_warnings(so_far, readings, day=replay_day)
@@ -282,7 +295,8 @@ with tab_map:
     map_col, legend_col = st.columns([4, 1])
     with map_col:
         show_risk = st.toggle("District risk layer", value=True, help="Early-warning level per district for the replay day")
-        st_folium(build_map(visible, warnings if show_risk else None), height=560, use_container_width=True,
+        map_view = {"bbox": INDIA_BBOX, "zoom": 5} if mode == "live" else {}
+        st_folium(build_map(visible, warnings if show_risk else None, **map_view), height=560, use_container_width=True,
                   returned_objects=[])
     with legend_col:
         counts = df["label"].value_counts().to_dict() if len(df) else {}
@@ -291,6 +305,9 @@ with tab_map:
             html('<div class="aa-glass aa-legend" style="margin-top:12px"><span class="aa-label">District risk</span>'
                  + "".join(f'<div class="aa-legend-row">{T.level_badge(l)}</div>' for l in ("warning", "watch", "normal"))
                  + "</div>")
+    if hidden_irrelevant and "irrelevant" not in labels:
+        st.caption(f"{len(hidden_irrelevant)} live posts hidden: the classifier is at least "
+                   f"{IRRELEVANT_HIDE_SCORE:.0%} sure they are irrelevant. Add 'irrelevant' under Categories to see them.")
     html(T.section("Posts", f"{len(df)} posts · newest first · click a column to sort"))
     if len(df):
         cols = ["time", "source", "label", "confidence", "language", "location", "misinfo", "rule", "people", "phones",
@@ -422,7 +439,7 @@ with tab_match:
     html(T.section("Needs ↔ Offers", f"{len(matches)} matches · score = {alpha:.2f} × text similarity "
                    f"+ {1 - alpha:.2f} × proximity (0 at {max_km} km)"))
     if matches:
-        st_folium(build_match_map(matches, so_far), height=480, use_container_width=True, returned_objects=[],
+        st_folium(build_match_map(matches, so_far, **map_view), height=480, use_container_width=True, returned_objects=[],
                   key="match_map")
         html(T.table_html(
             ["score", "km", "need", "need text", "offer", "offer text"],
