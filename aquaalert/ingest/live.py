@@ -3,8 +3,9 @@
 Sources (each fails independently, with exponential backoff):
   * sachet  - NDMA SACHET CAP RSS feeds (all-India + state feeds) -> CAP 1.2 XML per item; keeps flood,
               heavy-rain and river alerts as official alerts.
-  * news    - GDELT DOC 2.0 API (English + Hindi flood news from Indian sources). Google News RSS is NOT used:
-              news.google.com/robots.txt disallows /rss for generic agents.
+  * news    - experimental, off by default (see NEWS_SETTING): GDELT DOC 2.0 API (English + Hindi flood news from Indian
+              sources), never verified live. Google News RSS is NOT used: news.google.com/robots.txt disallows /rss for
+              generic agents.
   * bluesky - app.bsky.feed.searchPosts with an app-password session (BLUESKY_HANDLE / BLUESKY_APP_PASSWORD);
               skipped quietly when the credentials are missing. Unauthenticated search returns 403.
 Every request checks robots.txt (RFC 9309: 4xx = allowed, 5xx/unreachable = skip this poll; Python's robotparser
@@ -52,6 +53,7 @@ GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
 BSKY_PDS = "https://bsky.social"
 CAP_NS = {"cap": "urn:oasis:names:tc:emergency:cap:1.2"}
 SOURCES = ("sachet", "news", "bluesky")
+NEWS_SETTING = "news_enabled"  # the dashboard's sidebar toggle; the background poller reads it before each poll
 MAX_CAP_PER_POLL = 25  # CAP documents fetched per poll (the all-India feed lists 100 items)
 REQUEST_TIMEOUT = float(os.getenv("AQUAALERT_LIVE_REQUEST_TIMEOUT", "25"))  # seconds per HTTP request
 # Per-source time budget for one poll (seconds). A source still running past its budget is shown as "slow"; it keeps
@@ -202,6 +204,16 @@ def parse_sachet_rss(xml_bytes: bytes) -> list[dict]:
     return out
 
 
+def parse_cap_polygon(text: str) -> list[list[float]] | None:
+    """CAP polygon "lat,lon lat,lon ..." -> [[lat, lon], ...]; None unless it is a valid ring of at least 4 points."""
+    try:
+        points = [[float(v) for v in pair.split(",")] for pair in text.split()]
+    except ValueError:
+        return None
+    valid = len(points) >= 4 and all(len(p) == 2 and -90 <= p[0] <= 90 and -180 <= p[1] <= 180 for p in points)
+    return points if valid else None
+
+
 def parse_cap(xml_bytes: bytes) -> dict:
     """CAP 1.2 alert -> flat dict (English info block preferred, all area descriptions joined)."""
     root = ET.fromstring(xml_bytes)
@@ -212,6 +224,9 @@ def parse_cap(xml_bytes: bytes) -> dict:
                 infos[0])
     t = lambda node, tag: (node.findtext(f"cap:{tag}", namespaces=CAP_NS) or "").strip()  # noqa: E731
     areas = [t(a, "areaDesc") for i in infos[:1] for a in i.findall("cap:area", CAP_NS)]
+    polygons = [parse_cap_polygon(p.text or "") for p in info.findall("cap:area/cap:polygon", CAP_NS)]
+    # SACHET links its polygons from a <parameter>; that URL answered HTTP 403 on 2026-11-02, so it is kept but not fetched
+    polygon_url = next((t(p, "value") for p in info.findall("cap:parameter", CAP_NS) if t(p, "valueName") == "Polygon URL"), "")
     return {
         "identifier": t(root, "identifier"), "sender": t(root, "sender"), "sent": t(root, "sent"),
         "status": t(root, "status"), "msg_type": t(root, "msgType"),
@@ -219,6 +234,7 @@ def parse_cap(xml_bytes: bytes) -> dict:
         "urgency": t(info, "urgency"), "certainty": t(info, "certainty"), "effective": t(info, "effective"),
         "expires": t(info, "expires"), "headline": t(info, "headline"), "description": t(info, "description"),
         "instruction": t(info, "instruction"), "area": "; ".join(a for a in areas if a),
+        "polygons": [p for p in polygons if p], "polygon_url": polygon_url,
         "languages": [t(i, "language") for i in infos],
     }
 
@@ -384,6 +400,7 @@ CREATE TABLE IF NOT EXISTS seen (id TEXT PRIMARY KEY, seen_at TEXT);
 CREATE TABLE IF NOT EXISTS source_status (
   source TEXT PRIMARY KEY, state TEXT, last_attempt TEXT, last_success TEXT, last_error TEXT,
   failures INTEGER DEFAULT 0, next_allowed TEXT, last_new INTEGER DEFAULT 0, duration REAL, note TEXT);
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
 """
 
 
@@ -416,6 +433,15 @@ class LiveStore:
         c = sqlite3.connect(self.path, timeout=30)
         c.row_factory = sqlite3.Row
         return c
+
+    def news_enabled(self) -> bool:
+        with self._conn() as c:
+            row = c.execute("SELECT value FROM settings WHERE key=?", (NEWS_SETTING,)).fetchone()
+        return bool(row) and row["value"] == "1"
+
+    def set_news_enabled(self, enabled: bool) -> None:
+        with self._conn() as c:
+            c.execute("INSERT OR REPLACE INTO settings VALUES (?, ?)", (NEWS_SETTING, "1" if enabled else "0"))
 
     def add(self, items: list[LiveItem], now: datetime | None = None) -> int:
         """Insert new items; duplicates (same id, or same text from another source) are skipped."""
@@ -490,7 +516,8 @@ class Poller:
 
     Source states: ``ok`` | ``slow`` (finished but used > SLOW_AFTER of its budget, returned partial results, or is
     still running past its budget) | ``failed`` (error; exponential backoff) | ``skipped`` (not configured, blocked by
-    robots.txt, or the previous poll is still running). Items already stored stay visible whatever the state.
+    robots.txt, or the previous poll is still running) | ``off`` (experimental source not enabled). Items already
+    stored stay visible whatever the state, except news while it is off.
     """
 
     def __init__(self, store: LiveStore, fetch: PoliteFetcher | None = None, interval: int | None = None,
@@ -553,6 +580,10 @@ class Poller:
         results: dict[str, str] = {}
         started: dict[str, threading.Thread] = {}
         for source in SOURCES:
+            if source == "news" and not self.store.news_enabled():
+                self.store.set_status("news", state="off", note="experimental; not verified live", last_error=None)
+                results[source] = "off: experimental"
+                continue
             if source == "bluesky" and self.bluesky is None:
                 self.store.set_status("bluesky", state="skipped", note="not configured (no BLUESKY_HANDLE / "
                                       "BLUESKY_APP_PASSWORD)", last_error=None)
@@ -603,11 +634,14 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--once", action="store_true")
     ap.add_argument("--loop", action="store_true")
+    ap.add_argument("--news", choices=("on", "off"), help="enable or disable experimental GDELT polling (remembered)")
     a = ap.parse_args()
     from dotenv import load_dotenv
 
     load_dotenv(ROOT / ".env")
     store = LiveStore()
+    if a.news:
+        store.set_news_enabled(a.news == "on")
     poller = Poller(store)
     if a.loop:
         poller.run_forever()

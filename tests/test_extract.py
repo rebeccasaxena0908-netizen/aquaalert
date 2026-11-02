@@ -1,14 +1,13 @@
 import json
 import re
 from datetime import datetime
-from pathlib import Path
 
 import pytest
 
 from aquaalert.extract import gazetteer
 from aquaalert.extract.entities import (extract_locations, extract_people_count, extract_phones,
                                         extract_post)
-from aquaalert.extract.gazetteer import _load_india
+from aquaalert.extract.gazetteer import _load_csv
 from aquaalert.extract.geocode import Geocoder, in_bbox
 from aquaalert.schemas import Post
 
@@ -88,7 +87,7 @@ def test_other_states_get_pins(tmp_path, text, place, district):
 
 
 def test_gazetteer_rows_are_sourced_and_in_range():
-    for row in _load_india(Path(gazetteer.__file__).with_name("gazetteer_india.csv")):
+    for row in _load_csv("gazetteer_india.csv"):
         assert re.fullmatch(r"Q\d+", row["wikidata"]), row["name"]
         if row["lat"]:
             assert 17 < float(row["lat"]) < 31 and 77 < float(row["lon"]) < 97, row["name"]
@@ -117,3 +116,31 @@ def test_everyday_word_places_match_when_capitalised():
 
 def test_same_name_different_state_is_left_out():
     assert "lakhimpur" not in gazetteer.ALL_PLACES and "lakhimpur kheri" in gazetteer.ALL_PLACES
+
+
+def test_every_kerala_row_is_sourced_and_inside_kerala():
+    rows = _load_csv("gazetteer_kerala.csv")
+    assert len({r["wikidata"] for r in rows}) == 34
+    for row in rows:
+        assert re.fullmatch(r"Q\d+", row["wikidata"]) and in_bbox(float(row["lat"]), float(row["lon"])), row["name"]
+        assert row["district"] in gazetteer.DISTRICTS, row["name"]
+
+
+def test_paravur_means_north_paravur_in_ernakulam(tmp_path):
+    geo = Geocoder(cache_path=tmp_path / "g.json", online=False)
+    want = (10.15, 76.23)
+    for text in ("SOS at North Paravur", "SOS at Paravur", "North Parur flooded", "പറവൂരിൽ വെള്ളം"):
+        ex = extract_post(Post(id="x", text=text, timestamp=datetime(2018, 8, 15)), geo).extraction
+        assert (round(ex.geo.lat, 2), round(ex.geo.lon, 2)) == want and ex.district == "Ernakulam", text
+    assert extract_locations("North Paravur") == ["North Paravur"]
+
+
+@pytest.mark.parametrize("place, district, lat, lon", [
+    ("cheruthoni", "Idukki", 9.8453, 76.9669), ("mullaperiyar", "Idukki", 9.5286, 77.1442),
+    ("ranni", "Pathanamthitta", 9.3667, 76.7667), ("thiruvalla", "Pathanamthitta", 9.385, 76.575),
+    ("wayanad", "Wayanad", 11.6264, 76.0889), ("vypin", "Ernakulam", 10.1024, 76.2044),
+    ("pandalam", "Pathanamthitta", 9.2166, 76.6645),
+])
+def test_corrected_kerala_pins(tmp_path, place, district, lat, lon):
+    pt = Geocoder(cache_path=tmp_path / "g.json", online=False).geocode(place)
+    assert (round(pt.lat, 4), round(pt.lon, 4)) == (lat, lon) and gazetteer.DISTRICT_OF[place] == district

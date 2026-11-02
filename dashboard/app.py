@@ -24,8 +24,9 @@ from aquaalert.schemas import Label  # noqa: E402
 from aquaalert.summarize.brief import daily_briefs, latest_per_district  # noqa: E402
 from aquaalert.summarize.providers import TemplateProvider, get_provider  # noqa: E402
 from dashboard import theme as T  # noqa: E402
-from dashboard.helpers import (FLAG_THRESHOLD, IRRELEVANT_HIDE_SCORE, LABEL_COLORS, build_map,  # noqa: E402
-                               build_match_map, hidden_as_irrelevant, posts_to_frame)
+from dashboard.helpers import (FLAG_THRESHOLD, IRRELEVANT_HIDE_SCORE, LABEL_COLORS, SEVERITY_COLORS,  # noqa: E402
+                               alert_icon_svg, build_map, build_match_map, hidden_as_irrelevant, place_alerts,
+                               posts_to_frame)
 
 st.set_page_config(page_title="AquaAlert", page_icon="🌊", layout="wide")
 
@@ -111,7 +112,7 @@ def _processed_live(key: tuple, _posts: list):
 
 MODES = {
     "sample": ("REPLAY · Kerala Aug 2018 sample", ("replay", "synthetic")),
-    "live": ("LIVE · NDMA SACHET, news, Bluesky", ("live",)),
+    "live": ("LIVE · NDMA SACHET, Bluesky", ("live",)),
     "custom": ("REPLAY · your dataset file(s)", ("replay",)),
 }
 st.sidebar.markdown('<span class="aa-label">Dataset</span>', unsafe_allow_html=True)
@@ -134,8 +135,13 @@ if mode == "live":
     store = _live_store(_live_db_path())
     _poller_thread(_live_db_path())
     window_h = st.sidebar.select_slider("Live window (hours)", [6, 12, 24, 48], value=24)
+    news_on = st.sidebar.toggle("News (GDELT): experimental", value=store.news_enabled(), key="news_enabled",
+                                help="Off by default: GDELT has not been verified live (it rate-limited every test). "
+                                     "The background poller picks this up within about 30 s.")
+    if news_on != store.news_enabled():
+        store.set_news_enabled(news_on)
     now_utc = datetime.now(timezone.utc)
-    items = store.items(since=now_utc - timedelta(hours=window_h))
+    items = [i for i in store.items(since=now_utc - timedelta(hours=window_h)) if news_on or i.source != "news"]
     official_alerts = [i for i in items if i.kind == "official_alert"]
     live_counts = {s: sum(1 for i in items if i.source == s) for s in SOURCES}  # real sources only
     sim_active = sum(1 for i in items if i.source == simulate.SIM_SOURCE)
@@ -226,9 +232,11 @@ html(T.header_html([
 if mode == "live":
     # per-source status + counts (simulated posts are never counted here)
     cards = []
-    for src, label in (("sachet", "NDMA SACHET alerts"), ("news", "News (GDELT)"), ("bluesky", "Bluesky posts")):
+    for src, label in (("sachet", "NDMA SACHET alerts"), ("bluesky", "Bluesky posts"), ("news", "News (GDELT) · experimental")):
         stt = live_status.get(src, {})
         state = stt.get("state") or "waiting"
+        if src == "news" and not news_on:  # right away, not only after the next poll
+            state, stt = "off", {"note": "experimental; enable it in the sidebar"}
         kind = {"ok": "ok", "slow": "warn", "failed": "err", "skipped": "neu"}.get(state, "neu")
         when = f"last success {stt['last_success'][11:16]} UTC" if stt.get("last_success") else "no successful poll yet"
         took = f" · took {stt['duration']:.0f}s" if stt.get("duration") is not None else ""
@@ -243,7 +251,7 @@ if mode == "live":
     real_flood_posts = [p for p in posts if p.source != "simulated"]
     if not real_flood_posts and not official_alerts:
         html('<div class="aa-glass aa-empty"><div class="aa-panel-title">No flood-related items in the last '
-             f'{window_h}h</div>Nothing from SACHET, news or Bluesky passed the flood filter in this window. '
+             f'{window_h}h</div>Nothing from SACHET or Bluesky passed the flood filter in this window. '
              'This view is never padded with sample data; switch the dataset to Replay to explore the 2018 sample.</div>')
 
     @st.fragment(run_every="30s")
@@ -260,7 +268,7 @@ if mode == "live":
     with st.sidebar.expander("Simulate incident", expanded=sim_active > 0):
         st.caption(f"Injects {len(simulate.SIM_POSTS)} clearly synthetic posts (Hinglish rescue request, Malayalam SOS, "
                    "offer of boats, missing person, dam-breach rumour, …) into the live pipeline. They carry a "
-                   "SIMULATED badge and are never counted as SACHET, news or Bluesky items.")
+                   "SIMULATED badge and are never counted as source items.")
         if st.button("Simulate incident", key="sim_inject"):
             simulate.inject(store)
             st.rerun()
@@ -296,11 +304,17 @@ with tab_map:
     with map_col:
         show_risk = st.toggle("District risk layer", value=True, help="Early-warning level per district for the replay day")
         map_view = {"bbox": INDIA_BBOX, "zoom": 5} if mode == "live" else {}
-        st_folium(build_map(visible, warnings if show_risk else None, **map_view), height=560, use_container_width=True,
-                  returned_objects=[])
+        placed_alerts, unplaced_alerts = place_alerts(official_alerts)
+        st_folium(build_map(visible, warnings if show_risk else None, alerts=placed_alerts, **map_view), height=560,
+                  use_container_width=True, returned_objects=[])
+        if official_alerts:
+            why = "; ".join(f"{n} {reason}" for reason, n in unplaced_alerts.items())
+            st.caption(f"{len(placed_alerts)} of {len(official_alerts)} official alerts on the map"
+                       + (f". Not drawn: {why}." if why else "."))
     with legend_col:
         counts = df["label"].value_counts().to_dict() if len(df) else {}
-        html(T.legend_html(LABEL_COLORS, counts))
+        official_legend = (len(placed_alerts), alert_icon_svg(SEVERITY_COLORS["severe"], 14)) if mode == "live" else None
+        html(T.legend_html(LABEL_COLORS, counts, official_legend))
         if show_risk:
             html('<div class="aa-glass aa-legend" style="margin-top:12px"><span class="aa-label">District risk</span>'
                  + "".join(f'<div class="aa-legend-row">{T.level_badge(l)}</div>' for l in ("warning", "watch", "normal"))
@@ -350,7 +364,9 @@ with tab_warn:
         body = (f'<div class="aa-alert-meta">{T.esc(meta)}</div><p>{T.esc(e.get("headline") or a.text)}</p>'
                 + (f'<p><b>Instruction:</b> {T.esc(e["instruction"])}</p>' if e.get("instruction") else "")
                 + f'<a class="aa-label" href="{T.esc(a.url)}" target="_blank" rel="noopener noreferrer">CAP source ↗</a>')
+        cancelled = (e.get("msg_type") or "").lower() == "cancel"
         html(T.card(f'{T.official_badge()}{T.severity_badge(e.get("severity", ""))}'
+                    f'{T.badge("Cancelled by the issuer", "neu") if cancelled else ""}'
                     f'<span class="aa-panel-title">{T.esc(e.get("event") or "Alert")}</span>', body))
     html(T.section("AquaAlert warnings", "post-volume spike × sensor thresholds"))
     if not readings:

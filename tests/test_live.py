@@ -199,6 +199,7 @@ def test_poller_sources_fail_independently_with_backoff(tmp_path):
     routes = sachet_routes(**{"https://api.gdeltproject.org/robots.txt": (404, b""),
                               "https://api.gdeltproject.org/api": (429, b"Please limit requests")})
     st = L.LiveStore(tmp_path / "l.sqlite")
+    st.set_news_enabled(True)
     poller = L.Poller(st, fetcher(FakeNet(routes)), interval=600, bluesky=False)
     res = poller.poll_once(NOW, force=True)
     assert res["sachet"].startswith("ok") and res["news"].startswith("failed")
@@ -301,6 +302,7 @@ def test_slow_source_does_not_block_and_is_marked_slow(tmp_path):
     import time as _t
 
     st = L.LiveStore(tmp_path / "l.sqlite")
+    st.set_news_enabled(True)
     routes = sachet_routes(**{"https://api.gdeltproject.org/robots.txt": (404, b""),
                               "https://api.gdeltproject.org/api": (200, fx("gdelt_artlist.json"))})
     fetch = L.PoliteFetcher(transport=slow_net(1.5, routes), sleep=lambda s: None)
@@ -343,6 +345,7 @@ def test_partial_sachet_poll_is_slow_not_failed(tmp_path, monkeypatch):
 
 def test_robots_block_is_skipped_not_failed(tmp_path, monkeypatch):
     st = L.LiveStore(tmp_path / "l.sqlite")
+    st.set_news_enabled(True)
 
     def blocked(*a, **k):
         raise L.FetchError("blocked by robots.txt: https://example/rss")
@@ -382,3 +385,45 @@ def test_gdelt_retries_rate_limits_politely():
                              sleep=lambda s: None)
     with pytest.raises(L.FetchError, match="429"):
         L.poll_news(always, queries=("flood",))
+
+
+# ---------------------------------------------------------------- GDELT is experimental and off by default
+def test_gdelt_is_off_by_default_and_never_contacted(tmp_path):
+    st = L.LiveStore(tmp_path / "l.sqlite")
+    net = FakeNet(sachet_routes())
+    res = L.Poller(st, fetcher(net), interval=600, bluesky=False).poll_once(NOW, force=True)
+    assert res["news"] == "off: experimental" and st.status()["news"]["state"] == "off"
+    assert not any("gdelt" in u for u, _, _ in net.calls) and res["sachet"].startswith("ok")
+
+
+def test_gdelt_toggle_is_read_before_each_poll_and_remembered(tmp_path):
+    path = tmp_path / "l.sqlite"
+    routes = sachet_routes(**{"https://api.gdeltproject.org/robots.txt": (404, b""),
+                              "https://api.gdeltproject.org/api": (200, fx("gdelt_artlist.json"))})
+    net = FakeNet(routes)
+    st = L.LiveStore(path)
+    poller = L.Poller(st, fetcher(net), interval=600, bluesky=False)
+    poller.poll_once(NOW, force=True)
+    st.set_news_enabled(True)
+    assert L.LiveStore(path).news_enabled()
+    assert poller.poll_once(NOW, force=True)["news"].startswith("ok") and any("gdelt" in u for u, _, _ in net.calls)
+    st.set_news_enabled(False)
+    assert poller.poll_once(NOW, force=True)["news"] == "off: experimental"
+
+
+# ---------------------------------------------------------------- CAP geometry
+def test_cap_polygon_parsing():
+    ring = "10.0,76.2 10.2,76.2 10.2,76.4 10.0,76.2"
+    assert L.parse_cap_polygon(ring) == [[10.0, 76.2], [10.2, 76.2], [10.2, 76.4], [10.0, 76.2]]
+    for bad in ("", "10.0,76.2 10.2,76.2", "a,b c,d e,f g,h", "95,76 95,77 96,77 95,76", "10,76,1 10,77,1 11,77,1 10,76,1"):
+        assert L.parse_cap_polygon(bad) is None, bad
+
+
+def test_parse_cap_reads_inline_polygons_and_records_the_polygon_url():
+    flood = fx("sachet_cap_flood.xml").decode()
+    assert L.parse_cap(flood.encode())["polygons"] == []
+    inline = flood.replace("<area><areaDesc>Ernakulam district: Aluva, Paravur</areaDesc></area>",
+                           "<area><areaDesc>Ernakulam</areaDesc><polygon>10.0,76.2 10.2,76.2 10.2,76.4 10.0,76.2</polygon>"
+                           "<polygon>not a polygon</polygon></area>", 1)
+    assert L.parse_cap(inline.encode())["polygons"] == [[[10.0, 76.2], [10.2, 76.2], [10.2, 76.4], [10.0, 76.2]]]
+    assert "FetchPolygonXMLFile" in L.parse_cap(fx("sachet_cap_thunderstorm.xml"))["polygon_url"]

@@ -3,12 +3,16 @@ from __future__ import annotations
 
 import hashlib
 import html
+from collections import Counter
+from dataclasses import dataclass
+from datetime import datetime, timezone
 
 import folium
 import pandas as pd
 
 from aquaalert.config import KERALA_BBOX
-from aquaalert.extract.gazetteer import ALL_PLACES
+from aquaalert.extract.entities import gazetteer_places
+from aquaalert.extract.gazetteer import ALL_PLACES, DISTRICT_OF
 from aquaalert.schemas import Label, Post
 
 FLAG_THRESHOLD = 0.5  # misinfo score at which a marker is drawn as "doubtful"
@@ -111,17 +115,104 @@ def add_risk_layer(fmap: folium.Map, warnings: list) -> folium.Map:
     return fmap
 
 
+SEVERITY_COLORS = {"extreme": "#7B1E3B", "severe": "#C4484F", "moderate": "#D9902F"}
+SEVERITY_OTHER = "#5F6B7A"  # minor / unknown
+
+
+def severity_color(severity: str | None) -> str:
+    return SEVERITY_COLORS.get((severity or "").strip().lower(), SEVERITY_OTHER)
+
+
+def alert_icon_svg(color: str, size: int = 26) -> str:
+    """Warning triangle: official alerts must not look like the round post markers."""
+    return (f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 23 21.5H1Z" '
+            f'fill="{color}" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>'
+            '<path d="M12 9v6M12 17.2v1.6" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>')
+
+
+@dataclass
+class PlacedAlert:
+    """An official alert and where to draw it: its CAP polygons, or else markers at the districts its area names."""
+    item: object  # ingest.live.LiveItem
+    polygons: list[list[list[float]]]
+    markers: list[tuple[str, tuple[float, float]]]
+
+
+def _not_active(extra: dict, now: datetime) -> str | None:
+    if (extra.get("msg_type") or "").lower() == "cancel":
+        return "cancelled"
+    try:
+        return "expired" if datetime.fromisoformat(extra.get("expires") or "") <= now else None
+    except ValueError:  # no usable expiry: treated as still active
+        return None
+
+
+def _area_districts(area: str) -> list[tuple[str, tuple[float, float]]]:
+    """District points for the places an alert's area text names (several places in one district give one marker)."""
+    districts = dict.fromkeys(DISTRICT_OF[p] for p in gazetteer_places(area) if p in DISTRICT_OF)
+    return [(d, ALL_PLACES[d.lower()]) for d in districts if d.lower() in ALL_PLACES]
+
+
+def place_alerts(alerts: list, now: datetime | None = None) -> tuple[list[PlacedAlert], Counter]:
+    """Alerts that can go on the map, and why the others can't (never guessed: an unknown area is skipped)."""
+    now = now or datetime.now(timezone.utc)
+    placed, skipped = [], Counter()
+    for item in alerts:
+        reason = _not_active(item.extra, now)
+        if reason:
+            skipped[reason] += 1
+            continue
+        polygons = item.extra.get("polygons") or []
+        markers = [] if polygons else _area_districts(item.extra.get("area") or "")
+        if polygons or markers:
+            placed.append(PlacedAlert(item, polygons, markers))
+        else:
+            skipped["no polygon, and the area names no known district"] += 1
+    return placed, skipped
+
+
+def alert_popup(item) -> str:
+    """Event, severity, area, expiry and a link to the original. CAP text is untrusted, so everything is escaped."""
+    e = item.extra
+    rows = "".join(f"<div><b>{name}:</b> {html.escape(str(value))}</div>" for name, value in (
+        ("Severity", e.get("severity") or "not given"), ("Area", e.get("area") or "not given"),
+        ("Expires", (e.get("expires") or "not given").replace("T", " "))))
+    link = (f'<div><a class="aa-pop-link" href="{html.escape(item.url, quote=True)}" target="_blank" '
+            'rel="noopener noreferrer">original alert ↗</a></div>') if item.url.startswith(("https://", "http://")) else ""
+    return (f'<div class="aa-pop-title">{html.escape(e.get("event") or "Official alert")}</div>'
+            f'<div class="aa-pop-meta">Official alert (NDMA SACHET)</div>{rows}{link}')
+
+
+def add_official_alerts(fmap: folium.Map, placed: list[PlacedAlert]) -> folium.Map:
+    """Dashed outlines for CAP polygons, warning triangles for district markers; coloured by severity."""
+    layer = folium.FeatureGroup(name="Official alerts")
+    for alert in placed:
+        color = severity_color(alert.item.extra.get("severity"))
+        tip = html.escape(f"Official alert: {alert.item.extra.get('event') or 'alert'}")
+        for polygon in alert.polygons:
+            folium.Polygon(polygon, color=color, weight=3, dash_array="8 5", fill=True, fill_opacity=0.08, tooltip=tip,
+                           popup=folium.Popup(alert_popup(alert.item), max_width=320)).add_to(layer)
+        for _, point in alert.markers:
+            folium.Marker(point, tooltip=tip, popup=folium.Popup(alert_popup(alert.item), max_width=320),
+                          icon=folium.DivIcon(html=alert_icon_svg(color), icon_size=(26, 26), icon_anchor=(13, 24),
+                                              class_name="aa-alert-marker")).add_to(layer)
+    layer.add_to(fmap)
+    return fmap
+
+
 def hidden_as_irrelevant(post: Post) -> bool:
     """Live mode hides posts the classifier is sure are irrelevant; unsure ones stay on screen for a person to judge."""
     return post.label == Label.IRRELEVANT and (post.label_score or 0) >= IRRELEVANT_HIDE_SCORE
 
 
 def build_map(posts: list[Post], warnings: list | None = None, bbox: tuple[float, float, float, float] = KERALA_BBOX,
-              zoom: int = 7) -> folium.Map:
+              zoom: int = 7, alerts: list[PlacedAlert] | None = None) -> folium.Map:
     south, west, north, east = bbox
     fmap = _themed(folium.Map(location=[(south + north) / 2, (west + east) / 2], zoom_start=zoom, tiles="OpenStreetMap"))
     if warnings:
         add_risk_layer(fmap, warnings)
+    if alerts:
+        add_official_alerts(fmap, alerts)
     for p in posts:
         geo = p.extraction.geo if p.extraction else None
         if geo is None or p.label is None:

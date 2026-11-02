@@ -1,8 +1,10 @@
 """Build aquaalert/extract/gazetteer_india.csv from Wikidata (CC0) through the public QLever SPARQL endpoint.
 
-    python scripts/build_gazetteer.py
+    python scripts/build_gazetteer.py            # both tables
+    python scripts/build_gazetteer.py kerala     # or only "kerala" / "india"
 
-Covers districts, towns (population >= MIN_POPULATION, or district headquarters) and named rivers of Assam, Odisha,
+gazetteer_kerala.csv: the Kerala places listed by Wikidata id in KERALA_IDS (districts come from the same table).
+gazetteer_india.csv covers districts, towns (population >= MIN_POPULATION, or district headquarters) and named rivers of Assam, Odisha,
 West Bengal, Bihar and Uttar Pradesh. Every row keeps its Wikidata id, so each coordinate can be checked. Places
 without a coordinate on Wikidata are skipped, never estimated. Requests go through the robots.txt-aware PoliteFetcher.
 """
@@ -24,6 +26,7 @@ from aquaalert.ingest.live import PoliteFetcher  # noqa: E402
 
 ENDPOINT = "https://qlever.cs.uni-freiburg.de/api/wikidata"
 OUT = ROOT / "aquaalert" / "extract" / "gazetteer_india.csv"
+KERALA_OUT = ROOT / "aquaalert" / "extract" / "gazetteer_kerala.csv"
 STATES = {"Q1164": "Assam", "Q22048": "Odisha", "Q1356": "West Bengal", "Q1165": "Bihar", "Q1498": "Uttar Pradesh"}
 MIN_POPULATION = 50_000
 EXTRA_TOWNS = ("Bagaha",)  # flood-prone towns Wikidata has no population figure for
@@ -56,6 +59,25 @@ CASE_SENSITIVE = {"gaya", "mau", "basti", "banda", "puri", "saran", "nadia", "ba
 BAD_ALIASES = {"गया", "मऊ", "बस्ती", "बांदा", "पुरी", "सारण", "आरा", "बाँका", "बांका", "मानस", "नदिया", "গয়া", "বাঁকা", "পুরী",
                "ওরাই", "বস্তী", "বাস্তি", "বান্দা", "বালি", "बाली", "बक्सा", "हालि", "संभल", "মানস"}
 KERALA_QID = "Q1186"
+# place -> (Wikidata id, district). Ids are explicit because labels are ambiguous: three "Paravur"s and two "Kottayam"s.
+# Pandalam uses its municipality: the town entity Q3531011 is 12 km from the 15 other Pandalam entities (bus station, schools).
+KERALA_IDS = {
+    "thiruvananthapuram": ("Q167715", "Thiruvananthapuram"), "kollam": ("Q321475", "Kollam"),
+    "pathanamthitta": ("Q1025266", "Pathanamthitta"), "alappuzha": ("Q585026", "Alappuzha"),
+    "kottayam": ("Q659887", "Kottayam"), "idukki": ("Q1756169", "Idukki"), "ernakulam": ("Q1025408", "Ernakulam"),
+    "kochi": ("Q1800", "Ernakulam"), "thrissur": ("Q163798", "Thrissur"), "palakkad": ("Q1006240", "Palakkad"),
+    "malappuram": ("Q956893", "Malappuram"), "kozhikode": ("Q28729", "Kozhikode"), "wayanad": ("Q1364427", "Wayanad"),
+    "kannur": ("Q4789666", "Kannur"), "kasaragod": ("Q317217", "Kasaragod"), "chengannur": ("Q888384", "Alappuzha"),
+    "aluva": ("Q588793", "Ernakulam"), "kuttanad": ("Q1435109", "Alappuzha"), "pandalam": ("Q29467707", "Pathanamthitta"),
+    "ranni": ("Q7293397", "Pathanamthitta"), "aranmula": ("Q4784130", "Pathanamthitta"), "chalakudy": ("Q861830", "Thrissur"),
+    "cheruthoni": ("Q5092629", "Idukki"), "thiruvalla": ("Q2336443", "Pathanamthitta"),
+    "north paravur": ("Q3595582", "Ernakulam"), "edathua": ("Q116177757", "Alappuzha"), "kakkanad": ("Q1606027", "Ernakulam"),
+    "munnar": ("Q1025124", "Idukki"), "vythiri": ("Q7944042", "Wayanad"), "shoranur": ("Q2720784", "Palakkad"),
+    "edappally": ("Q3595603", "Ernakulam"), "vypin": ("Q3139226", "Ernakulam"), "perumbavoor": ("Q2737591", "Ernakulam"),
+    "mullaperiyar": ("Q2723522", "Idukki"),
+}
+# Same Wikidata row under another name. Bare "Paravur" meant North Paravur in the 2018 floods, not the Kollam town.
+KERALA_SPELLINGS = {"paravur": "north paravur", "north parur": "north paravur"}
 # Coarse (south, west, north, east) sanity boxes: Wikidata has errors, e.g. Banka's headquarters resolved to a point in
 # Slovakia. These only reject a coordinate; they never supply one.
 STATE_BOXES = {"Assam": (24.0, 89.6, 28.2, 96.1), "Odisha": (17.7, 81.3, 22.7, 87.6), "West Bengal": (21.4, 85.7, 27.3, 89.95),
@@ -116,13 +138,6 @@ def extras_query() -> str:
   ?p rdfs:label ?en ; wdt:P131+ ?state ; wdt:P625 ?coord .
   OPTIONAL {{ ?p wdt:P131+ ?district . ?district wdt:P31 wd:Q1149652 ; rdfs:label ?districten . FILTER(LANG(?districten) = "en") }}
   {LABELS} }}"""
-
-
-def kerala_check_query(names: list[str]) -> str:
-    values = " ".join(f'"{n}"@en' for n in names)
-    return f"""SELECT DISTINCT ?en ?coord WHERE {{
-  VALUES ?en {{ {values} }}
-  ?p rdfs:label ?en ; wdt:P131+ wd:{KERALA_QID} ; wdt:P625 ?coord . }}"""
 
 
 def parse_point(wkt: str) -> tuple[float, float] | None:
@@ -245,8 +260,26 @@ def write_csv(rows: list[dict], path: Path = OUT) -> None:
                         int(r["name"] in CASE_SENSITIVE), "|".join(sorted(r["aliases"]))])
 
 
-def main() -> None:
-    fetch = PoliteFetcher()
+def build_kerala(fetch: PoliteFetcher) -> None:
+    ids = " ".join(f"wd:{qid}" for qid, _ in KERALA_IDS.values())
+    points: dict[str, tuple[float, float]] = {}
+    rows = query(fetch, f"SELECT DISTINCT ?p ?coord WHERE {{ VALUES ?p {{ {ids} }} ?p wdt:P625 ?coord . }}")
+    for r in sorted(rows, key=lambda r: r["coord"]):  # a few entities hold two nearby points: take one, deterministically
+        pt = parse_point(r["coord"])
+        if pt:
+            points.setdefault(r["p"].rsplit("/", 1)[-1], pt)
+    with KERALA_OUT.open("w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["name", "lat", "lon", "district", "wikidata"])
+        for name, (qid, district) in sorted(KERALA_IDS.items()):
+            w.writerow([name, *points[qid], district, qid])  # a missing coordinate stops the build: nothing is estimated
+        for spelling, name in sorted(KERALA_SPELLINGS.items()):
+            qid, district = KERALA_IDS[name]
+            w.writerow([spelling, *points[qid], district, qid])
+    print(f"wrote {len(KERALA_IDS)} places + {len(KERALA_SPELLINGS)} spellings to {KERALA_OUT}")
+
+
+def build_india(fetch: PoliteFetcher) -> None:
     raw = {"district": query(fetch, districts_query()), "headquarters": query(fetch, headquarters_query()),
            "town": query(fetch, towns_query()), "extra": query(fetch, extras_query()),
            "river": query(fetch, rivers_query())}
@@ -259,16 +292,15 @@ def main() -> None:
     print(f"wrote {len(rows)} places to {OUT}: {dict(kinds)}; aliases: {sum(len(r['aliases']) for r in rows)}")
     for reason, names in skipped.items():
         print(f"skipped, {reason}: {sorted(names)}")
-    from aquaalert.extract.gazetteer import KERALA_PLACES
 
-    found: dict[str, list[tuple[float, float]]] = defaultdict(list)
-    for r in query(fetch, kerala_check_query([n.title() for n in KERALA_PLACES])):
-        pt = parse_point(r["coord"])
-        if pt:
-            found[r["en"].lower()].append(pt)
-    far = sorted(((min(km(c, p) for p in found[n]), n) for n, c in KERALA_PLACES.items() if n in found), reverse=True)
-    print(f"Kerala check: {len(far)}/{len(KERALA_PLACES)} found on Wikidata; largest gaps (km):",
-          [(n, round(d, 1)) for d, n in far[:6]], "| not found:", sorted(set(KERALA_PLACES) - set(found)))
+
+def main() -> None:
+    which = sys.argv[1] if len(sys.argv) > 1 else "all"
+    fetch = PoliteFetcher()
+    if which in ("all", "kerala"):
+        build_kerala(fetch)
+    if which in ("all", "india"):
+        build_india(fetch)
 
 
 if __name__ == "__main__":

@@ -22,7 +22,7 @@ language → classify → extract → credibility over a list of posts.
 
 | Module | Role | Key files | Needs |
 |---|---|---|---|
-| `ingest/` | Load CSV/JSON/JSONL datasets; replay a dataset in time order; **Live mode** polling of NDMA SACHET, GDELT news and Bluesky into SQLite; simulated incidents | `loader.py`, `replay.py`, `live.py`, `simulate.py` | Bluesky app password optional |
+| `ingest/` | Load CSV/JSON/JSONL datasets; replay a dataset in time order; **Live mode** polling of NDMA SACHET and Bluesky into SQLite (GDELT news is an experimental option, off by default); simulated incidents | `loader.py`, `replay.py`, `live.py`, `simulate.py` | Bluesky app password optional |
 | `language/` | Language ID: native Indic scripts by Unicode block, romanised Hindi/Malayalam/Bengali by lexicon; code-mixing flag; per-language evaluation | `detect.py`, `evaluate.py` | – |
 | `classify/` | 7-class crisis classifier. Fine-tuned MuRIL → embed_lr baseline → keyword fallback (auto); distress rule layer; HumAID label mapping; training + evaluation | `model.py`, `rules.py`, `train.py`, `embed_lr.py`, `label_map.py` | MuRIL weights (`scripts/fetch_model.py`) optional |
 | `extract/` | Places (Latin + Malayalam/Devanagari/Bengali names), phones, people counts; offline gazetteer + cached Nominatim; district lookup | `entities.py`, `gazetteer.py`, `geocode.py` | – |
@@ -100,9 +100,22 @@ never pads the view with sample data. CLI: `python -m aquaalert.ingest.live --on
 | Source | What | Access | Status |
 |---|---|---|---|
 | **NDMA SACHET** | CAP 1.2 alerts from IMD, CWC and state SDMAs. Feeds: `https://sachet.ndma.gov.in/cap_public_website/rss/rss_<feed>.xml` for `india`, `kerala`, `assam`, `bihar`, `odisha`, `uttarakhand`, `karnataka`, `maharashtra`, `gujarat`; each item links to its CAP XML. Flood, heavy-rain and river alerts are kept (event, severity, urgency, area, sender, effective/expires, headline, instruction, link). | Public, no key; no robots.txt (404 = allowed) | **Verified live on 2 Nov 2026** (first on 1 Nov: all 9 feeds fetched; 2 heavy-rain alerts kept (Andhra Pradesh SDMA, cyclone rain)). Multi-word states (Tamil Nadu, West Bengal, …) returned 404 for every spelling tried, so they come only via the all-India feed. Slow at times (a full poll took ~3 min). |
-| **News (GDELT DOC 2.0)** | English and Hindi flood headlines from Indian sources, with real titles, links and times | Public, no key; ≤ 1 request / 5 s (enforced: 6 s gap; a 429 is retried after 15 s, then 30 s) | **Built but not verified**: on 2026-11-01 every API request returned HTTP 429 ("Please limit requests to one every 5 seconds") even 12–42 s apart, after earlier TLS timeouts; robots.txt is absent (404). Tested on a constructed response. |
 | **Bluesky** | `app.bsky.feed.searchPosts` for flood, cloudburst, waterlogging and glacial-lake terms in English, Hindi, Malayalam (`sort=latest`, last 24 h). Only text, time and link are kept: no handle or display name is stored or shown (the link uses the account's DID, and opening it on Bluesky shows the author there). | Needs a login: unauthenticated search returns 403. Session via `com.atproto.server.createSession` on `bsky.social`, kept in memory only | **Verified live on 2 Nov 2026** with an app password. Skipped quietly when the credentials are missing. |
 | ~~Google News RSS~~ | – | **Not used**: `news.google.com/robots.txt` disallows `/` (incl. `/rss`) for generic agents | – |
+
+**Experimental, not a live source: News (GDELT DOC 2.0).** The code polls English and Hindi flood headlines, but this has
+never been verified live: on 2026-11-01 every request returned HTTP 429 even 12–42 s apart, and on 2026-11-02 a poll
+returned nothing in 117 s. It is off by default and its card shows `off`; **News (GDELT): experimental** in the sidebar
+turns it on (remembered in the store; the poller picks it up within about 30 s, and turning it off hides stored news).
+CLI: `python -m aquaalert.ingest.live --once --news on`. Tested only on a constructed response.
+
+**Official alerts on the map:** Live mode draws SACHET alerts as dashed outlines (a CAP polygon) or warning triangles
+(a district), coloured by severity, with event, severity, area, expiry and a link to the original. A district marker sits
+at the district's gazetteer point, usually its headquarters town rather than a true centroid (see Geocoding). Cancelled and
+expired alerts, and alerts whose area can't be placed, are left off, and the caption under the map says how many and why;
+nothing is placed by guesswork. **Most real alerts can't be placed today:** SACHET's CAP files carry no inline polygon but
+link one (`FetchPolygonXMLFile`), and that URL answers HTTP 403 to this client (checked 2026-11-02; it is not worked
+around). Their `areaDesc` is often a file name ("heavy_rainfall_2026-11-02") or a taluka outside the gazetteer.
 
 **Never blocking:** each source polls in its own background thread with a time budget (120 s each for SACHET, news
 and Bluesky) and 25 s per-request timeouts. SACHET stops fetching CAP documents near its budget and keeps what it
@@ -131,8 +144,8 @@ password). Restart the dashboard.
 - **Social data is sparse.** Outside a real flood there may be nothing for hours; Bluesky is small in India, and
   X/Twitter (where 2018's posts were) is a paid API and not used.
 - **Live posts are mostly news-style**, so rescue and matching are shown with **Simulate incident**.
-- **Headlines are not citizen posts.** News titles ("Heavy rain triggers flood alert in Ernakulam") are reports, so the
-  classifier mostly labels them *info update*; rescue requests, offers and missing-person posts come from social posts.
+- **Headlines are not citizen posts.** Even on Bluesky, many posts are news headlines, which the classifier mostly labels
+  *info update*; rescue requests, offers and missing-person posts need citizen posts.
 - **Classifier shift.** MuRIL was trained on 2016-2019 disaster tweets (HumAID); 2026 headlines, Bluesky posts and other
   regions differ in style and vocabulary, so expect lower accuracy than the HumAID numbers below.
 - **Geography.** The gazetteer maps Kerala, Assam, Odisha, West Bengal, Bihar and Uttar Pradesh (see Geocoding); posts
@@ -352,9 +365,17 @@ The gazetteer maps **398 places**:
   [QLever SPARQL endpoint](https://qlever.cs.uni-freiburg.de/wikidata) by `scripts/build_gazetteer.py`, because
   robots.txt disallows automated access to GeoNames downloads and to Wikidata's own query service for generic agents.
   Every row keeps its Wikidata id, and the English, Devanagari and Bengali names come from the same entity.
-- **34 in Kerala**, typed in by hand in Phase 1 and not sourced row by row. A Wikidata check found 29 of them: 28 are
-  within about 12 km, and `paravur` is 161 km from the only Wikidata "Paravur" because that is a different town in Kollam
-  (ours is North Paravur). Cheruthoni, Mullaperiyar, Ranni, Thiruvalla and Wayanad were not found under those labels.
+- **34 in Kerala**, in [`aquaalert/extract/gazetteer_kerala.csv`](aquaalert/extract/gazetteer_kerala.csv), from the same
+  source with the entity chosen by id in `scripts/build_gazetteer.py`. These replaced coordinates typed by hand in Phase 1;
+  the largest move is Vypin at 11.7 km. Bare "Paravur" means **North Paravur** (Ernakulam), the 2018 flood town, not the
+  Paravur in Kollam. Four entries are stand-ins for the place: Cheruthoni uses Cheruthoni Dam, Ranni uses "Ranni village",
+  Pandalam uses Pandalam Municipality (the town entity is 12 km from the 15 other Pandalam entities), and Kuttanad is a
+  region, so its point is only approximate. OpenStreetMap was not used: robots.txt disallows Nominatim and Overpass for
+  generic agents.
+
+**No true district centroids:** no district polygons are bundled, and Wikidata's point for a district is usually its
+headquarters. So distance to that point is not an error check: 14 correct Kerala places are more than 15 km from it (for
+example Shoranur, 40 km, and Mullaperiyar, 42 km). Wikidata's "located in" chain confirms the district for most of them.
 
 Nothing is estimated. Rejected rather than guessed: coordinates outside the place's state (Wikidata puts one Banka entity
 in Slovakia), and names shared by different places (Lakhimpur, Akbarpur, Midnapore; use "Lakhimpur Kheri" or

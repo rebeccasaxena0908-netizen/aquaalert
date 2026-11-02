@@ -20,15 +20,17 @@ Timings are a guide; the bold lines are what to say, the rest is what to do.
 
 ### Pre-demo checklist for Live mode (optional segment)
 
-1. **30 minutes before:** start the dashboard and pick **Dataset → LIVE · NDMA SACHET, news, Bluesky** (or start it
+1. **30 minutes before:** start the dashboard and pick **Dataset → LIVE · NDMA SACHET, Bluesky** (or start it
    with `AQUAALERT_MODE=live streamlit run dashboard/app.py`). The background poller needs a few polls to fill the
    store; the first SACHET poll can take several minutes.
 2. **Check the SACHET card** under the header: `ok` with a recent "last success" time is good; `slow` means it is
    working but near its 120 s budget (stored alerts stay visible). `failed` means the feed is down: open
    <https://sachet.ndma.gov.in/cap_public_website/rss/rss_india.xml> in a browser to confirm, and plan to use Replay.
-   **Live-source claims:** SACHET and Bluesky were verified live on 2 Nov 2026; news (GDELT) is built but not verified,
-   and its card may show `failed` when GDELT is rate-limiting. Bluesky shows `skipped` without an app password. No source
-   can freeze the page: polling runs in the background.
+   **Live-source claims:** the live sources are SACHET and Bluesky, verified live on 2 Nov 2026. Bluesky shows `skipped`
+   without an app password. GDELT news is experimental and not a live source: its card shows `off`, so leave its sidebar
+   toggle off. No source can freeze the page: polling runs in the background.
+   **Official alerts on the map:** check the caption under the map before promising any. Many real alerts can't be
+   placed (see README), and the caption says how many are on the map and why the rest aren't.
 3. **Check the Gemini key**: ask the chatbot one question. An HTTP 429 / timeout notice means briefs and chat will use
    the offline fallback.
 4. **Expect sparse, news-style data.** Outside a flood, Live mode may honestly show "No flood-related items in the
@@ -125,9 +127,11 @@ The sources list under the summary links each cited post.
 
 - **s021 → s022**: *"Rescue boats needed at Edathua, 30 people on a terrace"* ↔ *"Fishermen from Alappuzha are
   bringing their boats to help rescue operations"*, 21 km, score 0.62.
-- **m010 → s035**: Hinglish *"Kochi relief camp me dawai aur khana chahiye"* ↔ English *"Doctors available for free
-  medical aid at Kochi relief camps"*, score 0.71. **"Matching works across languages because the embeddings are
-  multilingual."**
+- **s012 → s035**: *"Need medicines and insulin for elderly patients at Ernakulam camp"* ↔ *"Doctors available for free
+  medical aid at Kochi relief camps"*, 1.3 km, score 0.72.
+- Turn off **One offer per need** to show **m010 → s035**: Hinglish *"Kochi relief camp me dawai aur khana chahiye"* ↔ the
+  same English offer, score 0.71. It is hidden by default because s012 takes that offer first. **"Matching works across
+  languages because the embeddings are multilingual."**
 - Drag **Text weight** down to show proximity taking over.
 
 ## 4:25 – 5:00 · Warnings
@@ -188,8 +192,8 @@ Limitations to say out loud:
 - **Credibility is heuristic**, tuned on 16 synthetic rumour posts; treat scores as "check this", never as proof.
 - **Synthetic demo data**: posts, rumours and sensor readings are made up (shaped like 2018); the romanised
   training data is LLM-generated (~10 % meaning drift in a spot check; Bengali short of target).
-- **Geocoding** is a gazetteer of 398 mapped places (34 in Kerala entered by hand; 364 in Assam, Odisha, West Bengal,
-  Bihar and Uttar Pradesh from Wikidata) plus optional Nominatim; unknown villages are not mapped.
+- **Geocoding** is a gazetteer of 398 mapped places (34 in Kerala; 364 in Assam, Odisha, West Bengal, Bihar and Uttar
+  Pradesh; all from Wikidata) plus optional Nominatim; unknown villages are not mapped.
 - **Matching inherits classifier errors** (see the issues list below).
 - The API has **no authentication**; run it locally.
 
@@ -209,7 +213,7 @@ Found while checking each feature on the sample data (15–16 Aug replay, romani
 2. **Matches inherit those errors.** m011's truck *offer* is treated as a need and matched to m018 (another offer);
    m019 (an offer of a place to stay) is matched to m003 (an offer of boats); and s038 (15 people stuck in a Kuttanad
    church) is matched to **r012**, the "Army has stopped all rescue operations … forward to all" rumour (misinformation
-   0.35, below the 0.5 hide threshold). Show s021→s022 and m010→s035 instead.
+   0.35, below the 0.5 hide threshold). Show s021→s022, s012→s035 and m010→s035 (with One offer per need off) instead.
 3. **`/classify` with romanised text** now works for both sentences tried (m009's sentence and *"Hum chhat par phase hue
    hain, please help! Aluva"*), but other ad-lib phrasings may still miss; stick to the script's sentence.
 4. **Default replay time is 16 Aug 08:00**, when no district is at WARNING (0 warnings, 13 watch); move the slider to

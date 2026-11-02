@@ -139,10 +139,14 @@ def card(title_html: str, body_html: str) -> str:
     return f'<div class="aa-glass aa-card"><div class="aa-card-head">{title_html}</div>{body_html}</div>'
 
 
-def legend_html(colors: dict[str, str], counts: dict[str, int]) -> str:
+def legend_html(colors: dict[str, str], counts: dict[str, int], official: tuple[int, str] | None = None) -> str:
+    """``official``: (alerts on the map, icon HTML), Live mode only."""
     rows = "".join(f'<div class="aa-legend-row"><span class="aa-dot" style="background:{c}"></span>'
                    f'{esc(l.replace("_", " "))}<span class="aa-count">{counts.get(l, 0)}</span></div>' for l, c in colors.items())
     rows += ('<div class="aa-legend-row"><span class="aa-dot aa-hollow"></span>doubtful (low credibility)</div>')
+    if official:
+        rows += (f'<div class="aa-legend-row">{official[1]}Official alert (NDMA SACHET)<span class="aa-count">{official[0]}'
+                 '</span></div><div class="aa-kpi-note">triangle or dashed outline; darker red = more severe, amber = moderate</div>')
     return f'<div class="aa-glass aa-legend"><span class="aa-label">Legend</span>{rows}</div>'
 
 

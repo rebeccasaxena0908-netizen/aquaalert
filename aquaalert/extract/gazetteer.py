@@ -1,7 +1,7 @@
 """Offline gazetteer (name -> lat, lon) used before any network lookup.
 
-Kerala: the hand-entered table below. Assam, Odisha, West Bengal, Bihar and Uttar Pradesh: gazetteer_india.csv, generated
-from Wikidata by scripts/build_gazetteer.py (each row keeps its Wikidata id). A row with blank coordinates is a river that
+gazetteer_kerala.csv (Kerala) and gazetteer_india.csv (Assam, Odisha, West Bengal, Bihar, Uttar Pradesh) are generated
+from Wikidata by scripts/build_gazetteer.py; each row keeps its Wikidata id. A row with blank coordinates is a river that
 is recognised in text but has no usable point, so it never gets a pin.
 """
 from __future__ import annotations
@@ -9,58 +9,22 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-KERALA_PLACES: dict[str, tuple[float, float]] = {
-    "thiruvananthapuram": (8.5241, 76.9366),
-    "kollam": (8.8932, 76.6141),
-    "pathanamthitta": (9.2648, 76.7870),
-    "alappuzha": (9.4981, 76.3388),
-    "kottayam": (9.5916, 76.5222),
-    "idukki": (9.8494, 76.9710),
-    "ernakulam": (9.9816, 76.2999),
-    "kochi": (9.9312, 76.2673),
-    "thrissur": (10.5276, 76.2144),
-    "palakkad": (10.7867, 76.6548),
-    "malappuram": (11.0510, 76.0711),
-    "kozhikode": (11.2588, 75.7804),
-    "wayanad": (11.6854, 76.1320),
-    "kannur": (11.8745, 75.3704),
-    "kasaragod": (12.4996, 74.9869),
-    "chengannur": (9.3158, 76.6150),
-    "aluva": (10.1004, 76.3570),
-    "kuttanad": (9.3800, 76.4200),
-    "pandalam": (9.2243, 76.6770),
-    "ranni": (9.3866, 76.7845),
-    "aranmula": (9.3190, 76.6970),
-    "chalakudy": (10.3070, 76.3340),
-    "cheruthoni": (9.8460, 76.9760),
-    "thiruvalla": (9.3840, 76.5740),
-    "paravur": (10.1500, 76.2230),
-    "edathua": (9.3560, 76.4650),
-    "kakkanad": (10.0158, 76.3419),
-    "munnar": (10.0889, 77.0595),
-    "vythiri": (11.5500, 76.0400),
-    "shoranur": (10.7630, 76.2740),
-    "edappally": (10.0261, 76.3080),
-    "vypin": (10.0000, 76.2300),
-    "perumbavoor": (10.1130, 76.4750),
-    "mullaperiyar": (9.5280, 77.1440),
-}
+
+def _load_csv(name: str) -> list[dict]:
+    with Path(__file__).with_name(name).open(encoding="utf-8", newline="") as f:
+        return list(csv.DictReader(f))
+
+
+_KERALA_ROWS = _load_csv("gazetteer_kerala.csv")
+KERALA_PLACES: dict[str, tuple[float, float]] = {r["name"]: (float(r["lat"]), float(r["lon"])) for r in _KERALA_ROWS}
 
 DISTRICTS: tuple[str, ...] = (
     "Thiruvananthapuram", "Kollam", "Pathanamthitta", "Alappuzha", "Kottayam", "Idukki", "Ernakulam",
     "Thrissur", "Palakkad", "Malappuram", "Kozhikode", "Wayanad", "Kannur", "Kasaragod",
 )
 
-# place (lowercase) -> district; district names and Kochi map to themselves / Ernakulam.
-DISTRICT_OF: dict[str, str] = {
-    **{d.lower(): d for d in DISTRICTS},
-    "kochi": "Ernakulam", "chengannur": "Alappuzha", "aluva": "Ernakulam", "kuttanad": "Alappuzha",
-    "pandalam": "Pathanamthitta", "ranni": "Pathanamthitta", "aranmula": "Pathanamthitta",
-    "chalakudy": "Thrissur", "cheruthoni": "Idukki", "thiruvalla": "Pathanamthitta",
-    "paravur": "Ernakulam", "edathua": "Alappuzha", "kakkanad": "Ernakulam", "munnar": "Idukki",
-    "vythiri": "Wayanad", "shoranur": "Palakkad", "edappally": "Ernakulam", "vypin": "Ernakulam",
-    "perumbavoor": "Ernakulam", "mullaperiyar": "Idukki",
-}
+# place (lowercase) -> district
+DISTRICT_OF: dict[str, str] = {r["name"]: r["district"] for r in _KERALA_ROWS}
 
 # Native-script names -> canonical (lowercase) place. Malayalam and Bengali attach case endings to names
 # ("ചെങ്ങന്നൂരിൽ" = in Chengannur), so these are matched as prefixes, see extract/entities.py.
@@ -70,7 +34,7 @@ NATIVE_ALIASES: dict[str, str] = {
     "പന്തളം": "pandalam", "റാന്നി": "ranni", "ആറന്മുള": "aranmula", "ചാലക്കുടി": "chalakudy",
     "തൃശൂർ": "thrissur", "തൃശ്ശൂർ": "thrissur", "എറണാകുളം": "ernakulam", "കൊച്ചി": "kochi", "ഇടുക്കി": "idukki",
     "വയനാട്": "wayanad", "പത്തനംതിട്ട": "pathanamthitta", "കോട്ടയം": "kottayam", "തിരുവല്ല": "thiruvalla",
-    "പറവൂർ": "paravur", "മൂന്നാർ": "munnar", "കോഴിക്കോട്": "kozhikode", "പാലക്കാട്": "palakkad",
+    "പറവൂർ": "north paravur", "മൂന്നാർ": "munnar", "കോഴിക്കോട്": "kozhikode", "പാലക്കാട്": "palakkad",
     "കണ്ണൂർ": "kannur", "മലപ്പുറം": "malappuram", "കൊല്ലം": "kollam", "തിരുവനന്തപുരം": "thiruvananthapuram",
     "എടത്വ": "edathua", "പെരുമ്പാവൂർ": "perumbavoor", "ചെറുതോണി": "cheruthoni", "മുല്ലപ്പെരിയാർ": "mullaperiyar",
     "കാക്കനാട്": "kakkanad", "വൈപ്പിൻ": "vypin",
@@ -98,12 +62,7 @@ for _alias, _place in list(NATIVE_ALIASES.items()):
         NATIVE_ALIASES.setdefault(_alias[:-1] + "ത്ത", _place)
 
 
-def _load_india(path: Path) -> list[dict]:
-    with path.open(encoding="utf-8", newline="") as f:
-        return list(csv.DictReader(f))
-
-
-_INDIA_ROWS = _load_india(Path(__file__).with_name("gazetteer_india.csv"))
+_INDIA_ROWS = _load_csv("gazetteer_india.csv")
 INDIA_PLACES: dict[str, tuple[float, float]] = {
     r["name"]: (float(r["lat"]), float(r["lon"])) for r in _INDIA_ROWS if r["lat"] and r["name"] not in KERALA_PLACES}
 ALL_PLACES: dict[str, tuple[float, float]] = {**INDIA_PLACES, **KERALA_PLACES}

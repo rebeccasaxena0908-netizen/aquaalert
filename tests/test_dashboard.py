@@ -11,8 +11,9 @@ from aquaalert.extract.geocode import Geocoder
 from aquaalert.ingest.loader import load_posts
 from aquaalert.pipeline import process_posts
 from aquaalert.match.matcher import hashing_encoder, match_posts
-from dashboard.helpers import (IRRELEVANT_HIDE_SCORE, LABEL_COLORS, build_map, build_match_map, hidden_as_irrelevant, jitter,
-                               posts_to_frame)
+from aquaalert.extract.gazetteer import ALL_PLACES
+from dashboard.helpers import (IRRELEVANT_HIDE_SCORE, LABEL_COLORS, SEVERITY_COLORS, alert_popup, build_map, build_match_map,
+                               hidden_as_irrelevant, jitter, place_alerts, posts_to_frame)
 from aquaalert.schemas import LABELS, Label
 
 APP = Path(__file__).resolve().parent.parent / "dashboard" / "app.py"
@@ -207,6 +208,7 @@ def test_live_mode_sources_official_alerts_and_simulation(monkeypatch, tmp_path)
     db = live_app(monkeypatch, tmp_path)
     now = datetime.now(timezone.utc)
     cap = parse_cap((Path(__file__).parent / "fixtures" / "live" / "sachet_cap_flood.xml").read_bytes())
+    LiveStore(db).set_news_enabled(True)
     LiveStore(db).add([
         LiveItem(id="sachet:T1", source="sachet", kind="official_alert", text=cap["headline"],
                  url="https://sachet.ndma.gov.in/x", published_at=now - timedelta(hours=1), extra=cap),
@@ -257,6 +259,7 @@ def test_live_source_cards_show_state_last_success_and_note(monkeypatch, tmp_pat
 
     db = live_app(monkeypatch, tmp_path)
     st = LiveStore(db)
+    st.set_news_enabled(True)
     st.set_status("sachet", state="slow", last_success="2026-11-01T16:05:00+00:00", duration=118.0,
                   note="time budget reached after 9 of 25 new CAP documents")
     st.set_status("news", state="failed", last_error="rate limited by api.gdeltproject.org (HTTP 429)", duration=6.0)
@@ -299,6 +302,7 @@ def test_live_mode_hides_confident_irrelevant_but_category_filter_reaches_them(m
     st.cache_data.clear()
     now = datetime.now(timezone.utc)
     texts = ("Flood alert issued for Patna", "Flood themed biryani night", "maybe a flood somewhere")
+    LiveStore(db).set_news_enabled(True)
     LiveStore(db).add([LiveItem(id=f"news:{i}", source="news", kind="news", text=t, url="https://x/a",
                                 published_at=now - timedelta(hours=1)) for i, t in enumerate(texts)])
     try:
@@ -331,3 +335,80 @@ def test_nothing_identifying_a_bluesky_account_reaches_the_screen(monkeypatch, t
     shown = page_html(at) + frame.to_csv()
     assert "resident.example" not in shown and "Example Person" not in shown and "author" not in frame.columns
     assert "Water entering houses near Aluva" in shown and "/post/3kabc111" in shown
+
+
+# ---------------------------------------------------------------- official alerts on the map
+def alert(id="a", severity="Severe", area="Ernakulam district: Aluva, Paravur", polygons=(), msg_type="Alert",
+          expires="2099-01-01T00:00:00+05:30", url="https://sachet.ndma.gov.in/x?identifier=1"):
+    from aquaalert.ingest.live import LiveItem
+
+    return LiveItem(id=f"sachet:{id}", source="sachet", kind="official_alert", text=f"headline {id}", url=url,
+                    published_at=datetime.now(timezone.utc),
+                    extra={"event": "Flood", "severity": severity, "area": area, "expires": expires, "msg_type": msg_type,
+                           "polygons": list(polygons)})
+
+
+RING = [[10.0, 76.2], [10.2, 76.2], [10.2, 76.4], [10.0, 76.2]]
+
+
+def test_place_alerts_polygon_first_then_district_then_skip():
+    placed, skipped = place_alerts([
+        alert("poly", polygons=[RING]), alert("district"), alert("two", area="Patna, Gaya and Kochi"),
+        alert("file", area="heavy_rainfall_2026-11-02"), alert("taluka", area="Dharbandora taluka,Sanguem taluka"),
+        alert("cancel", msg_type="Cancel"), alert("old", expires="2020-01-01T00:00:00+05:30"),
+    ])
+    by_id = {p.item.id: p for p in placed}
+    assert by_id["sachet:poly"].polygons == [RING] and by_id["sachet:poly"].markers == []
+    assert [d for d, _ in by_id["sachet:district"].markers] == ["Ernakulam"]  # three places, one district, one marker
+    assert by_id["sachet:district"].markers[0][1] == ALL_PLACES["ernakulam"]
+    assert [d for d, _ in by_id["sachet:two"].markers] == ["Patna", "Gaya", "Ernakulam"]
+    assert skipped == {"no polygon, and the area names no known district": 2, "cancelled": 1, "expired": 1}
+
+
+def test_alerts_are_drawn_differently_from_posts_with_a_full_popup():
+    evil = alert("x", area='Ernakulam <img src=x onerror="a()">', url="https://sachet.ndma.gov.in/x?identifier=1")
+    placed, _ = place_alerts([alert("poly", severity="Extreme", polygons=[RING]), alert("mod", severity="Moderate"), evil])
+    page = build_map([], alerts=placed).get_root().render()
+    assert page.count("L.polygon(") == 1 and page.count("L.circleMarker(") == 0 and "M12 2.5 23 21.5H1Z" in page
+    assert SEVERITY_COLORS["extreme"] in page and SEVERITY_COLORS["moderate"] in page and SEVERITY_COLORS["severe"] in page
+    assert "Official alert (NDMA SACHET)" in page and "Severity:" in page and "Area:" in page and "Expires:" in page
+    assert "2099-01-01 00:00:00+05:30" in page and "sachet.ndma.gov.in/x?identifier=1" in page and "original alert" in page
+    assert "<img src=x" not in page
+
+
+def test_alert_popup_drops_a_link_that_is_not_http():
+    assert "href" not in alert_popup(alert(url="javascript:alert(1)"))
+
+
+def test_live_map_shows_alert_count_and_legend(monkeypatch, tmp_path):
+    from aquaalert.ingest.live import LiveStore
+
+    db = live_app(monkeypatch, tmp_path)
+    LiveStore(db).add([alert("a"), alert("b", area="heavy_rainfall_2026-11-02"), alert("c", msg_type="Cancel")])
+    at = AppTest.from_file(str(APP), default_timeout=120).run()
+    assert not at.exception, at.exception
+    assert "Official alert (NDMA SACHET)" in page_html(at) and "Cancelled by the issuer" in page_html(at)
+    captions = " ".join(c.value for c in at.caption)
+    assert "1 of 3 official alerts on the map" in captions and "1 cancelled" in captions
+    assert "1 no polygon, and the area names no known district" in captions
+
+
+def test_replay_map_has_no_official_alert_legend(monkeypatch):
+    monkeypatch.delenv("AQUAALERT_MODE", raising=False)
+    at = AppTest.from_file(str(APP), default_timeout=120).run()
+    assert not at.exception and "Official alert (NDMA SACHET)" not in page_html(at)
+
+
+def test_gdelt_card_is_experimental_off_by_default_and_toggle_enables_it(monkeypatch, tmp_path):
+    from aquaalert.ingest.live import LiveItem, LiveStore
+
+    db = live_app(monkeypatch, tmp_path)
+    store = LiveStore(db)
+    store.add([LiveItem(id="news:1", source="news", kind="news", text="Flood alert issued for Patna", url="https://x/a",
+                        published_at=datetime.now(timezone.utc) - timedelta(hours=1))])
+    at = AppTest.from_file(str(APP), default_timeout=120).run()
+    states = dict(re.findall(r'data-source="(\w+)" data-count="\d+" data-state="(\w+)"', page_html(at)))
+    assert not at.exception and states["news"] == "off" and "experimental" in page_html(at)
+    assert source_counts(at)["news"] == 0 and kpis(at)["posts"] == 0 and not store.news_enabled()
+    at.sidebar.toggle(key="news_enabled").set_value(True).run()
+    assert not at.exception and store.news_enabled() and source_counts(at)["news"] == 1 and kpis(at)["posts"] == 1

@@ -62,15 +62,16 @@ def _alias_hits(text: str) -> list[tuple[int, str]]:
     return [(m.start(), INDIA_ALIASES[m.group(1)]) for m in _ALIAS_RE.finditer(unicodedata.normalize("NFC", text))]
 
 
-def extract_locations(text: str) -> list[str]:
-    """Gazetteer hits (Latin and native script, in text order), then capitalised 'in/at/near X'."""
-    found: list[str] = []
+def gazetteer_places(text: str) -> list[str]:
+    """Places named in the text and known to the gazetteer (Latin and native script), lowercase, in text order."""
     ordered = [(m.start(), m.group(1).lower()) for r in (_PLACE_RE, _CASED_PLACE_RE) for m in r.finditer(text)]
     ordered += _native_hits(text) + _alias_hits(text)
-    for _, place in sorted(ordered):
-        name = place.title()
-        if name not in found:
-            found.append(name)
+    return list(dict.fromkeys(place for _, place in sorted(ordered)))
+
+
+def extract_locations(text: str) -> list[str]:
+    """Gazetteer hits, then capitalised 'in/at/near X'."""
+    found = [place.title() for place in gazetteer_places(text)]
     for m in _PREP_RE.finditer(text):
         name = m.group(1)
         if name in _STOPWORDS or name.split()[0] in _STOPWORDS:
