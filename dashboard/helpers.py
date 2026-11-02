@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import html
+import re
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -12,7 +13,7 @@ import pandas as pd
 
 from aquaalert.config import KERALA_BBOX
 from aquaalert.extract.entities import gazetteer_places
-from aquaalert.extract.gazetteer import ALL_PLACES, DISTRICT_OF
+from aquaalert.extract.gazetteer import ALL_PLACES, DISTRICT_OF, STATE_POINTS
 from aquaalert.schemas import Label, Post
 
 FLAG_THRESHOLD = 0.5  # misinfo score at which a marker is drawn as "doubtful"
@@ -130,12 +131,20 @@ def alert_icon_svg(color: str, size: int = 26) -> str:
             '<path d="M12 9v6M12 17.2v1.6" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>')
 
 
+def state_banner_svg(color: str, size: int = 30) -> str:
+    """Banner on a pole: a whole state, unlike the triangle (a district) and the round post markers."""
+    return (f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 2v21" stroke="#fff" '
+            'stroke-width="4" stroke-linecap="round"/><path d="M4 2v21" stroke="#33414F" stroke-width="2" stroke-linecap="round"/>'
+            f'<path d="M5 3h16l-4 5 4 5H5Z" fill="{color}" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>')
+
+
 @dataclass
 class PlacedAlert:
-    """An official alert and where to draw it: its CAP polygons, or else markers at the districts its area names."""
+    """An official alert and where to draw it: CAP polygons, else district markers, else a whole state."""
     item: object  # ingest.live.LiveItem
     polygons: list[list[list[float]]]
     markers: list[tuple[str, tuple[float, float]]]
+    state: str | None = None
 
 
 def _not_active(extra: dict, now: datetime) -> str | None:
@@ -153,6 +162,26 @@ def _area_districts(area: str) -> list[tuple[str, tuple[float, float]]]:
     return [(d, ALL_PLACES[d.lower()]) for d in districts if d.lower() in ALL_PLACES]
 
 
+_STATES_LOWER = {s.lower(): s for s in STATE_POINTS}
+_FILE_NAME_AREA = re.compile(r"[a-z_]+_\d{4}-\d{2}-\d{2}")  # "heavy_rainfall_2026-11-02" names no place
+_NAMES_SUBAREA = re.compile(r"\b(?:districts?|taluk\w*|tehsils?|mandals?|blocks?|villages?)\b", re.IGNORECASE)
+
+
+def _alert_state(extra: dict) -> str | None:
+    """The state of an alert that gives no finer area, or None. An area listing talukas or a text naming districts does
+    specify the area, in a form we can't place, so it must not be labelled "not specified"."""
+    area = (extra.get("area") or "").strip()
+    text = f"{extra.get('headline') or ''} {extra.get('description') or ''}"
+    if _NAMES_SUBAREA.search(text) or gazetteer_places(text):
+        return None
+    if area.lower() in _STATES_LOWER:
+        return _STATES_LOWER[area.lower()]
+    if area and not _FILE_NAME_AREA.fullmatch(area):
+        return None
+    issuer = re.fullmatch(r"(.+?)[- ]SDMA", (extra.get("sender") or "").strip(), re.IGNORECASE)  # a state authority
+    return _STATES_LOWER.get(issuer.group(1).replace("-", " ").lower()) if issuer else None
+
+
 def place_alerts(alerts: list, now: datetime | None = None) -> tuple[list[PlacedAlert], Counter]:
     """Alerts that can go on the map, and why the others can't (never guessed: an unknown area is skipped)."""
     now = now or datetime.now(timezone.utc)
@@ -164,18 +193,20 @@ def place_alerts(alerts: list, now: datetime | None = None) -> tuple[list[Placed
             continue
         polygons = item.extra.get("polygons") or []
         markers = [] if polygons else _area_districts(item.extra.get("area") or "")
-        if polygons or markers:
-            placed.append(PlacedAlert(item, polygons, markers))
+        state = None if polygons or markers else _alert_state(item.extra)
+        if polygons or markers or state:
+            placed.append(PlacedAlert(item, polygons, markers, state))
         else:
             skipped["no polygon, and the area names no known district"] += 1
     return placed, skipped
 
 
-def alert_popup(item) -> str:
+def alert_popup(item, state: str | None = None) -> str:
     """Event, severity, area, expiry and a link to the original. CAP text is untrusted, so everything is escaped."""
     e = item.extra
+    area = f"{state}; affected districts not specified" if state else e.get("area") or "not given"
     rows = "".join(f"<div><b>{name}:</b> {html.escape(str(value))}</div>" for name, value in (
-        ("Severity", e.get("severity") or "not given"), ("Area", e.get("area") or "not given"),
+        ("Severity", e.get("severity") or "not given"), ("Area", area), *((("Issued by", e.get("sender")),) if state else ()),
         ("Expires", (e.get("expires") or "not given").replace("T", " "))))
     link = (f'<div><a class="aa-pop-link" href="{html.escape(item.url, quote=True)}" target="_blank" '
             'rel="noopener noreferrer">original alert ↗</a></div>') if item.url.startswith(("https://", "http://")) else ""
@@ -183,8 +214,15 @@ def alert_popup(item) -> str:
             f'<div class="aa-pop-meta">Official alert (NDMA SACHET)</div>{rows}{link}')
 
 
+def _state_popup(state: str, alerts: list[PlacedAlert]) -> str:
+    note = (f'<div class="aa-pop-flag">State-level: the affected districts are not specified. This is a general point for '
+            f'{html.escape(state)}, not the affected area. Any map file the alerts link could not be read.</div>')
+    body = "<hr>".join(alert_popup(a.item, state) for a in alerts)
+    return f'{note}<div style="max-height:260px;overflow-y:auto">{body}</div>'
+
+
 def add_official_alerts(fmap: folium.Map, placed: list[PlacedAlert]) -> folium.Map:
-    """Dashed outlines for CAP polygons, warning triangles for district markers; coloured by severity."""
+    """Dashed outlines for CAP polygons, triangles for districts, one banner per state; coloured by severity."""
     layer = folium.FeatureGroup(name="Official alerts")
     for alert in placed:
         color = severity_color(alert.item.extra.get("severity"))
@@ -196,6 +234,17 @@ def add_official_alerts(fmap: folium.Map, placed: list[PlacedAlert]) -> folium.M
             folium.Marker(point, tooltip=tip, popup=folium.Popup(alert_popup(alert.item), max_width=320),
                           icon=folium.DivIcon(html=alert_icon_svg(color), icon_size=(26, 26), icon_anchor=(13, 24),
                                               class_name="aa-alert-marker")).add_to(layer)
+    # several alerts for one state share a point, so they share a banner (separate markers would hide each other)
+    by_state: dict[str, list[PlacedAlert]] = {}
+    for alert in placed:
+        if alert.state:
+            by_state.setdefault(alert.state, []).append(alert)
+    for state, alerts in by_state.items():
+        worst = next((s for s in SEVERITY_COLORS if any((a.item.extra.get("severity") or "").lower() == s for a in alerts)), "")
+        folium.Marker(STATE_POINTS[state], tooltip=html.escape(f"{state}: {len(alerts)} state-level official alert(s)"),
+                      popup=folium.Popup(_state_popup(state, alerts), max_width=340),
+                      icon=folium.DivIcon(html=state_banner_svg(severity_color(worst)), icon_size=(30, 30), icon_anchor=(6, 28),
+                                          class_name="aa-alert-marker")).add_to(layer)
     layer.add_to(fmap)
     return fmap
 

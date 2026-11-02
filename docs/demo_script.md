@@ -30,7 +30,8 @@ Timings are a guide; the bold lines are what to say, the rest is what to do.
    without an app password. GDELT news is experimental and not a live source: its card shows `off`, so leave its sidebar
    toggle off. No source can freeze the page: polling runs in the background.
    **Official alerts on the map:** check the caption under the map before promising any. Many real alerts can't be
-   placed (see README), and the caption says how many are on the map and why the rest aren't.
+   placed precisely (see README), and the caption says how many are on the map and why the rest aren't. A banner means
+   state-level only: say that it is not the affected area.
 3. **Check the Gemini key**: ask the chatbot one question. An HTTP 429 / timeout notice means briefs and chat will use
    the offline fallback.
 4. **Expect sparse, news-style data.** Outside a flood, Live mode may honestly show "No flood-related items in the

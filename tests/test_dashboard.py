@@ -11,8 +11,8 @@ from aquaalert.extract.geocode import Geocoder
 from aquaalert.ingest.loader import load_posts
 from aquaalert.pipeline import process_posts
 from aquaalert.match.matcher import hashing_encoder, match_posts
-from aquaalert.extract.gazetteer import ALL_PLACES
-from dashboard.helpers import (IRRELEVANT_HIDE_SCORE, LABEL_COLORS, SEVERITY_COLORS, alert_popup, build_map, build_match_map,
+from aquaalert.extract.gazetteer import ALL_PLACES, _load_csv
+from dashboard.helpers import (IRRELEVANT_HIDE_SCORE, LABEL_COLORS, SEVERITY_COLORS, STATE_POINTS, alert_popup, build_map, build_match_map,
                                hidden_as_irrelevant, jitter, place_alerts, posts_to_frame)
 from aquaalert.schemas import LABELS, Label
 
@@ -339,13 +339,13 @@ def test_nothing_identifying_a_bluesky_account_reaches_the_screen(monkeypatch, t
 
 # ---------------------------------------------------------------- official alerts on the map
 def alert(id="a", severity="Severe", area="Ernakulam district: Aluva, Paravur", polygons=(), msg_type="Alert",
-          expires="2099-01-01T00:00:00+05:30", url="https://sachet.ndma.gov.in/x?identifier=1"):
+          expires="2099-01-01T00:00:00+05:30", url="https://sachet.ndma.gov.in/x?identifier=1", sender="", headline=""):
     from aquaalert.ingest.live import LiveItem
 
     return LiveItem(id=f"sachet:{id}", source="sachet", kind="official_alert", text=f"headline {id}", url=url,
                     published_at=datetime.now(timezone.utc),
                     extra={"event": "Flood", "severity": severity, "area": area, "expires": expires, "msg_type": msg_type,
-                           "polygons": list(polygons)})
+                           "polygons": list(polygons), "sender": sender, "headline": headline})
 
 
 RING = [[10.0, 76.2], [10.2, 76.2], [10.2, 76.4], [10.0, 76.2]]
@@ -412,3 +412,69 @@ def test_gdelt_card_is_experimental_off_by_default_and_toggle_enables_it(monkeyp
     assert source_counts(at)["news"] == 0 and kpis(at)["posts"] == 0 and not store.news_enabled()
     at.sidebar.toggle(key="news_enabled").set_value(True).run()
     assert not at.exception and store.news_enabled() and source_counts(at)["news"] == 1 and kpis(at)["posts"] == 1
+
+
+# ---------------------------------------------------------------- state-level official alerts
+AP_TEXT = ("Due to the impact of Cyclone Murasu in the Bay of Bengal, heavy rains accompanied by strong winds are likely in "
+           "your area today. The public is advised to remain alert and take necessary precautions. -Government of Andhra Pradesh")
+
+
+def ap(id="ap", area="heavy_rainfall_2026-11-02", sender="Andhra-Pradesh-SDMA", headline=AP_TEXT, **kw):
+    return alert(id, area=area, sender=sender, headline=headline, **kw)
+
+
+def test_state_level_only_when_no_finer_area_is_given():
+    assert place_alerts([ap()])[0][0].state == "Andhra Pradesh"
+    assert place_alerts([ap(area="", sender="Kerala-SDMA")])[0][0].state == "Kerala"
+    assert place_alerts([alert(area="Odisha", sender="IMD-Bhubaneswar", headline="Heavy rain likely")])[0][0].state == "Odisha"
+
+
+def test_state_level_is_refused_when_it_would_be_untrue():
+    refused = [
+        ap("taluka", area="Dharbandora taluka,Sanguem taluka", sender="Goa-SDMA"),  # area is specified, we just can't place it
+        ap("imd", sender="IMD-Goa"),  # a weather office, not a state authority
+        ap("unknown", sender="Atlantis-SDMA"),
+        ap("named", headline="Heavy rain likely in Krishna and Guntur districts"),
+        ap("known", headline="Heavy rain likely around Patna"),
+        ap("cancel", msg_type="Cancel"), ap("old", expires="2020-01-01T00:00:00+05:30"),
+    ]
+    placed, skipped = place_alerts(refused)
+    assert placed == [] and skipped["cancelled"] == 1 and skipped["expired"] == 1
+    assert skipped["no polygon, and the area names no known district"] == 5
+
+
+def test_finer_placement_wins_over_state():
+    placed, _ = place_alerts([ap("p", polygons=[RING]), ap("d", area="Patna")])
+    assert [p.state for p in placed] == [None, None] and placed[0].polygons and placed[1].markers
+
+
+def test_state_alerts_share_one_distinct_banner_with_an_honest_popup():
+    placed, _ = place_alerts([ap("a"), ap("b", severity="Extreme"), ap("c", area="very_heavy_rainfall_2026-11-02"),
+                              alert("d", area="Patna")])
+    page = build_map([], alerts=placed).get_root().render()
+    assert page.count("M5 3h16l-4 5 4 5H5Z") == 1 and page.count("M12 2.5 23 21.5H1Z") == 1  # one banner, one triangle
+    assert "3 state-level official alert(s)" in page and SEVERITY_COLORS["extreme"] in page  # worst severity colours it
+    assert "the affected districts are not specified" in page and "not the affected area" in page
+    assert "Andhra-Pradesh-SDMA" in page and "16.85" in page and "80.8667" in page
+    assert "heavy_rainfall_2026" not in page  # a file name is not shown as if it were an area
+
+
+def test_state_points_are_sourced_and_inside_india():
+    rows = _load_csv("gazetteer_states.csv")
+    assert len(rows) == 36 == len({r["wikidata"] for r in rows})
+    for r in rows:
+        assert re.fullmatch(r"Q\d+", r["wikidata"]) and 6 < float(r["lat"]) < 37 and 68 < float(r["lon"]) < 98, r["state"]
+    assert set(STATE_POINTS) == {r["state"] for r in rows}
+
+
+def test_live_page_counts_state_alerts_separately(monkeypatch, tmp_path):
+    from aquaalert.ingest.live import LiveStore
+
+    db = live_app(monkeypatch, tmp_path)
+    LiveStore(db).add([ap("a"), ap("b", area="very_heavy_rainfall_2026-11-02"), alert("c", area="Patna"),
+                       alert("t", area="Dharbandora taluka")])
+    at = AppTest.from_file(str(APP), default_timeout=120).run()
+    assert not at.exception, at.exception
+    assert "Official alert, state-level (area not specified)" in page_html(at)
+    assert "3 of 4 official alerts on the map (2 at state level, affected districts not specified)" in " ".join(
+        c.value for c in at.caption)

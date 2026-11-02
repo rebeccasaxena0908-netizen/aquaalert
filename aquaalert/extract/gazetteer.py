@@ -67,6 +67,9 @@ INDIA_PLACES: dict[str, tuple[float, float]] = {
     r["name"]: (float(r["lat"]), float(r["lon"])) for r in _INDIA_ROWS if r["lat"] and r["name"] not in KERALA_PLACES}
 ALL_PLACES: dict[str, tuple[float, float]] = {**INDIA_PLACES, **KERALA_PLACES}
 RIVERS: frozenset[str] = frozenset(r["name"] for r in _INDIA_ROWS if r["kind"] == "river")
+# One general point per state, for official alerts that give no finer area. Not used to place posts.
+STATE_POINTS: dict[str, tuple[float, float]] = {
+    r["state"]: (float(r["lat"]), float(r["lon"])) for r in _load_csv("gazetteer_states.csv")}
 # Names recognised in text (including rivers without a pin), split by whether case can be ignored
 PLACE_NAMES: frozenset[str] = frozenset(KERALA_PLACES) | {r["name"] for r in _INDIA_ROWS if r["case_sensitive"] == "0"}
 CASED_NAMES: frozenset[str] = frozenset(r["name"] for r in _INDIA_ROWS if r["case_sensitive"] == "1")

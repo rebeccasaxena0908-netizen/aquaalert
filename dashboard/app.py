@@ -26,7 +26,7 @@ from aquaalert.summarize.providers import TemplateProvider, get_provider  # noqa
 from dashboard import theme as T  # noqa: E402
 from dashboard.helpers import (FLAG_THRESHOLD, IRRELEVANT_HIDE_SCORE, LABEL_COLORS, SEVERITY_COLORS,  # noqa: E402
                                alert_icon_svg, build_map, build_match_map, hidden_as_irrelevant, place_alerts,
-                               posts_to_frame)
+                               posts_to_frame, state_banner_svg)
 
 st.set_page_config(page_title="AquaAlert", page_icon="🌊", layout="wide")
 
@@ -309,12 +309,16 @@ with tab_map:
                   use_container_width=True, returned_objects=[])
         if official_alerts:
             why = "; ".join(f"{n} {reason}" for reason, n in unplaced_alerts.items())
+            at_state = sum(1 for a in placed_alerts if a.state)
             st.caption(f"{len(placed_alerts)} of {len(official_alerts)} official alerts on the map"
+                       + (f" ({at_state} at state level, affected districts not specified)" if at_state else "")
                        + (f". Not drawn: {why}." if why else "."))
     with legend_col:
         counts = df["label"].value_counts().to_dict() if len(df) else {}
-        official_legend = (len(placed_alerts), alert_icon_svg(SEVERITY_COLORS["severe"], 14)) if mode == "live" else None
-        html(T.legend_html(LABEL_COLORS, counts, official_legend))
+        n_state = sum(1 for a in placed_alerts if a.state)
+        official_legend = (len(placed_alerts) - n_state, alert_icon_svg(SEVERITY_COLORS["severe"], 14)) if mode == "live" else None
+        state_legend = (n_state, state_banner_svg(SEVERITY_COLORS["severe"], 16)) if mode == "live" else None
+        html(T.legend_html(LABEL_COLORS, counts, official_legend, state_legend))
         if show_risk:
             html('<div class="aa-glass aa-legend" style="margin-top:12px"><span class="aa-label">District risk</span>'
                  + "".join(f'<div class="aa-legend-row">{T.level_badge(l)}</div>' for l in ("warning", "watch", "normal"))

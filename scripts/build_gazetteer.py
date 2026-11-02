@@ -1,8 +1,9 @@
 """Build aquaalert/extract/gazetteer_india.csv from Wikidata (CC0) through the public QLever SPARQL endpoint.
 
     python scripts/build_gazetteer.py            # both tables
-    python scripts/build_gazetteer.py kerala     # or only "kerala" / "india"
+    python scripts/build_gazetteer.py kerala     # or only "kerala" / "india" / "states"
 
+gazetteer_states.csv: one Wikidata point per current state and union territory, used only for state-level official alerts.
 gazetteer_kerala.csv: the Kerala places listed by Wikidata id in KERALA_IDS (districts come from the same table).
 gazetteer_india.csv covers districts, towns (population >= MIN_POPULATION, or district headquarters) and named rivers of Assam, Odisha,
 West Bengal, Bihar and Uttar Pradesh. Every row keeps its Wikidata id, so each coordinate can be checked. Places
@@ -27,6 +28,7 @@ from aquaalert.ingest.live import PoliteFetcher  # noqa: E402
 ENDPOINT = "https://qlever.cs.uni-freiburg.de/api/wikidata"
 OUT = ROOT / "aquaalert" / "extract" / "gazetteer_india.csv"
 KERALA_OUT = ROOT / "aquaalert" / "extract" / "gazetteer_kerala.csv"
+STATES_OUT = ROOT / "aquaalert" / "extract" / "gazetteer_states.csv"
 STATES = {"Q1164": "Assam", "Q22048": "Odisha", "Q1356": "West Bengal", "Q1165": "Bihar", "Q1498": "Uttar Pradesh"}
 MIN_POPULATION = 50_000
 EXTRA_TOWNS = ("Bagaha",)  # flood-prone towns Wikidata has no population figure for
@@ -75,6 +77,18 @@ KERALA_IDS = {
     "munnar": ("Q1025124", "Idukki"), "vythiri": ("Q7944042", "Wayanad"), "shoranur": ("Q2720784", "Palakkad"),
     "edappally": ("Q3595603", "Ernakulam"), "vypin": ("Q3139226", "Ernakulam"), "perumbavoor": ("Q2737591", "Ernakulam"),
     "mullaperiyar": ("Q2723522", "Idukki"),
+}
+# Current states and union territories by id: Wikidata also lists former ones (Andhra State, Madras State, ...) as states.
+INDIA_STATE_IDS = {
+    "Andhra Pradesh": "Q1159", "Arunachal Pradesh": "Q1162", "Assam": "Q1164", "Bihar": "Q1165", "Chhattisgarh": "Q1168",
+    "Goa": "Q1171", "Gujarat": "Q1061", "Haryana": "Q1174", "Himachal Pradesh": "Q1177", "Jharkhand": "Q1184",
+    "Karnataka": "Q1185", "Kerala": "Q1186", "Madhya Pradesh": "Q1188", "Maharashtra": "Q1191", "Manipur": "Q1193",
+    "Meghalaya": "Q1195", "Mizoram": "Q1502", "Nagaland": "Q1599", "Odisha": "Q22048", "Punjab": "Q22424",
+    "Rajasthan": "Q1437", "Sikkim": "Q1505", "Tamil Nadu": "Q1445", "Telangana": "Q677037", "Tripura": "Q1363",
+    "Uttar Pradesh": "Q1498", "Uttarakhand": "Q1499", "West Bengal": "Q1356",
+    "Andaman and Nicobar Islands": "Q40888", "Chandigarh": "Q120971341",
+    "Dadra and Nagar Haveli and Daman and Diu": "Q77997266", "Delhi": "Q9357528", "Jammu and Kashmir": "Q66278313",
+    "Ladakh": "Q200667", "Lakshadweep": "Q26927", "Puducherry": "Q66743",
 }
 # Same Wikidata row under another name. Bare "Paravur" meant North Paravur in the 2018 floods, not the Kollam town.
 KERALA_SPELLINGS = {"paravur": "north paravur", "north parur": "north paravur"}
@@ -279,6 +293,22 @@ def build_kerala(fetch: PoliteFetcher) -> None:
     print(f"wrote {len(KERALA_IDS)} places + {len(KERALA_SPELLINGS)} spellings to {KERALA_OUT}")
 
 
+def build_states(fetch: PoliteFetcher) -> None:
+    ids = " ".join(f"wd:{qid}" for qid in INDIA_STATE_IDS.values())
+    points: dict[str, tuple[float, float]] = {}
+    rows = query(fetch, f"SELECT DISTINCT ?p ?coord WHERE {{ VALUES ?p {{ {ids} }} ?p wdt:P625 ?coord . }}")
+    for r in sorted(rows, key=lambda r: r["coord"]):
+        pt = parse_point(r["coord"])
+        if pt:
+            points.setdefault(r["p"].rsplit("/", 1)[-1], pt)
+    with STATES_OUT.open("w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["state", "lat", "lon", "wikidata"])
+        for state, qid in sorted(INDIA_STATE_IDS.items()):
+            w.writerow([state, *points[qid], qid])  # a missing coordinate stops the build: nothing is estimated
+    print(f"wrote {len(INDIA_STATE_IDS)} states and union territories to {STATES_OUT}")
+
+
 def build_india(fetch: PoliteFetcher) -> None:
     raw = {"district": query(fetch, districts_query()), "headquarters": query(fetch, headquarters_query()),
            "town": query(fetch, towns_query()), "extra": query(fetch, extras_query()),
@@ -299,6 +329,8 @@ def main() -> None:
     fetch = PoliteFetcher()
     if which in ("all", "kerala"):
         build_kerala(fetch)
+    if which in ("all", "states"):
+        build_states(fetch)
     if which in ("all", "india"):
         build_india(fetch)
 

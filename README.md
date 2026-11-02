@@ -109,13 +109,23 @@ returned nothing in 117 s. It is off by default and its card shows `off`; **News
 turns it on (remembered in the store; the poller picks it up within about 30 s, and turning it off hides stored news).
 CLI: `python -m aquaalert.ingest.live --once --news on`. Tested only on a constructed response.
 
-**Official alerts on the map:** Live mode draws SACHET alerts as dashed outlines (a CAP polygon) or warning triangles
-(a district), coloured by severity, with event, severity, area, expiry and a link to the original. A district marker sits
+**Official alerts on the map:** Live mode draws SACHET alerts as dashed outlines (a CAP polygon), warning triangles (a
+district) or banners (a whole state), coloured by severity, with event, severity, area, expiry and a link to the original. A district marker sits
 at the district's gazetteer point, usually its headquarters town rather than a true centroid (see Geocoding). Cancelled and
 expired alerts, and alerts whose area can't be placed, are left off, and the caption under the map says how many and why;
-nothing is placed by guesswork. **Most real alerts can't be placed today:** SACHET's CAP files carry no inline polygon but
-link one (`FetchPolygonXMLFile`), and that URL answers HTTP 403 to this client (checked 2026-11-02; it is not worked
-around). Their `areaDesc` is often a file name ("heavy_rainfall_2026-11-02") or a taluka outside the gazetteer.
+nothing is placed by guesswork. **Most real alerts can't be placed precisely today:** SACHET's CAP files carry no inline polygon but link one
+(`FetchPolygonXMLFile`), and that URL answers HTTP 403 to this client (checked 2026-11-02; it is not worked around). Their
+`areaDesc` is often a file name ("heavy_rainfall_2026-11-02") or a taluka outside the gazetteer.
+
+A **state-level banner** ("Official alert, state-level (area not specified)") is a fallback for active alerts with no
+polygon and no known district, when the issuer is a state SDMA or the area is exactly a state name, the area text gives
+nothing finer (empty, a file name, or that state), and the alert text names no district, taluka, mandal, block or village.
+So "not specified" means not specified in anything readable here: such an alert may well target specific districts in the
+polygon file we can't read, and the state itself is usually inferred from the issuer. The banner is a general point for
+the state, not the affected area, and the popup says so. Alerts for one state share a banner, coloured by the worst
+severity. Points: one per current state and union territory in
+[`aquaalert/extract/gazetteer_states.csv`](aquaalert/extract/gazetteer_states.csv), from **Wikidata (CC0)** through QLever
+by `scripts/build_gazetteer.py`, each with its Wikidata id. Used only for these banners, never to place posts.
 
 **Never blocking:** each source polls in its own background thread with a time budget (120 s each for SACHET, news
 and Bluesky) and 25 s per-request timeouts. SACHET stops fetching CAP documents near its budget and keeps what it
