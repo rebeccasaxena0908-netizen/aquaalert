@@ -2,22 +2,32 @@
 
     python scripts/fetch_docs.py
 
-Each download is checked (PDF magic bytes / HTML title) before it is saved. Links were verified on 2026-11-01.
+Each download is checked (PDF magic bytes / HTML title) before it is saved, and retried on a dropped connection.
+Already-saved files are skipped, so it is safe to run again. Links were verified on 2026-11-01.
 """
 from __future__ import annotations
 
+import http.client
 import json
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
 DOCS = Path(__file__).resolve().parent.parent / "data" / "docs"
 
 
-def fetch(url: str) -> bytes:
+def fetch(url: str, attempts: int = 4, wait: float = 10.0) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": "aquaalert-docs-fetch"})
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        return resp.read()
+    for attempt in range(1, attempts + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                return resp.read()
+        except (OSError, http.client.HTTPException):  # dropped connections: the government sites are slow at times
+            if attempt == attempts:
+                raise
+            time.sleep(wait * attempt)
+    raise AssertionError("unreachable")
 
 
 def main() -> None:

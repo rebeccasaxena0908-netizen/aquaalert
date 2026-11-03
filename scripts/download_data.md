@@ -6,8 +6,8 @@
 | CrisisLex / CrisisMMD | extra labeled tweets | https://crisisnlp.qcri.org/ — direct download |
 | TREC-IS / CrisisFACTS | information-type labels, summarization refs | http://dcs.gla.ac.uk/~richardm/TREC_IS/ — registration/request may be required |
 | Kaggle Kerala floods tweets | unlabeled replay text | Kaggle account + API token required (manual) |
-| NDMA flood guidelines (PDF) | chatbot knowledge base | see README → Chatbot (checked links); manual download to `data/docs/` |
-| IMD rainfall / CWC river levels | sensor fusion (Phase 4) | Manual download to `data/sensors/` |
+| NDMA flood guidelines (PDF) | chatbot knowledge base | `python scripts/fetch_docs.py` (links in `data/docs/sources.json`) |
+| IMD rainfall / CWC river levels | sensor fusion (Phase 4) | Manual download to `data/sensors/`; **not done**, the bundled files are synthetic |
 
 ## HumAID
 - Official page: https://crisisnlp.qcri.org/humaid_dataset
@@ -21,4 +21,4 @@
 - HumAID has no timestamps in these files, so it is used for training/eval (`load_labeled`), not the replay feed.
 
 Loader needs a text column and a timestamp column (auto-detected); a label column is optional.
-Only the HumAID details above were verified; the other URLs were written from memory and are unchecked.
+Only the HumAID details above were verified; the other URLs were written from memory and are unchecked. See the README for licences.

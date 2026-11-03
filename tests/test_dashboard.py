@@ -53,7 +53,7 @@ def test_jitter_deterministic_and_small():
 def test_app_runs_end_to_end(monkeypatch):
     for k in ("GEMINI_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
         monkeypatch.setenv(k, "")  # tests never depend on (or call) a real LLM
-    at = AppTest.from_file(str(APP), default_timeout=60).run()
+    at = AppTest.from_file(str(APP), default_timeout=600).run()  # a fresh machine downloads the 470 MB embedding model here
     assert not at.exception and not at.error
     k = kpis(at)
     assert k["posts"] == 110 and k["rescue"] > 0 and {"warnings", "flagged"} <= set(k)

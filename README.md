@@ -1,23 +1,69 @@
-# AquaAlert — Multilingual AI for Flood Crisis Response
+# AquaAlert: multilingual AI for flood crisis response
 
-Turns flood-time posts (English, Hindi/Hinglish, Bengali, Malayalam, Assamese) into classified
-help requests on a map. See [CLAUDE.md](CLAUDE.md) for the full architecture and roadmap.
+During a flood, thousands of posts appear in several languages: people trapped on rooftops, offers of boats, missing
+relatives, rumours about dams. Nobody can read them all in time. AquaAlert is a research prototype that reads flood-time
+text in English, Hindi, Hinglish, Malayalam, Manglish, Bengali and Banglish, and turns it into classified help requests on
+a map, rumour flags, needs-to-offers matches, district briefs, early-warning signals and a preparedness chatbot.
 
-## Status: all four phases
-Every stage in CLAUDE.md is in place and runs with no downloads, training or API keys (synthetic sample data,
-offline fallbacks). Trained MuRIL weights and LLM keys make it better, not possible.
+**It is a prototype, not an operational system.** It has not been tested with responders or during a real flood. Do not
+rely on it for emergency decisions.
+
+The repo is private. See [Licences and data terms](#licences-and-data-terms) before sharing anything from it.
+
+## What is real, replayed and synthetic
+
+| | What | Notes |
+|---|---|---|
+| **Real** | HumAID disaster tweets | Used to train and test the classifiers, never shown in the dashboard |
+| **Real, live** | NDMA SACHET alerts and Bluesky posts | Live mode only. Both verified live on 2 Nov 2026 |
+| **Real** | NDMA and SDMA guideline documents | Chatbot knowledge base, downloaded by `scripts/fetch_docs.py` |
+| **Real** | Wikidata coordinates | The gazetteer and the state points |
+| **Replayed and synthetic** | `data/sample_posts*.csv` (110 posts) | Written by us, shaped like Kerala 2018 and replayed in time order. **No real 2018 posts are in the demo** |
+| **Synthetic** | `data/sensors/*.csv` (rainfall, river levels) | Made up by `scripts/make_sensor_samples.py`. **Not IMD or CWC data** |
+| **Simulated** | **Simulate incident** button | 8 made-up posts injected into Live mode, with a SIMULATED badge |
+| **LLM-generated** | `data/processed/romanised_humaid.csv` (4,552 rows) | Gemini rewrites of HumAID training tweets, used only as training data |
+| **Hand-written** | The language test posts (45 English, 49 in other languages and scripts) | The language accuracy table is measured on these |
+
+## Data sources
+
+| Source | Status | Used for |
+|---|---|---|
+| **NDMA SACHET** (CAP alerts) | **Verified live on 2 Nov 2026** | Official alerts in the Warnings tab and on the map |
+| **Bluesky** (`searchPosts`) | **Verified live on 2 Nov 2026** | Social posts in Live mode; needs an app password |
+| **GDELT news** | **Experimental, off by default, never verified live** | Sidebar toggle; every test was rate-limited or returned nothing. Not a live source |
+| HumAID ([`QCRI/HumAID-all`](https://huggingface.co/datasets/QCRI/HumAID-all)) | Downloaded | Training and evaluation |
+| NDMA and SDMA documents | Downloaded | Chatbot |
+| Wikidata via QLever | Bundled as CSVs | Place and state coordinates |
+| X/Twitter, Google News RSS, real IMD/CWC feeds | **Not used** | Paid API; robots.txt disallows; not connected |
 
 ## Architecture
+
 ```
-            ┌──────────── data/sensors/*.csv (rainfall, river levels)
-            │
-ingest ─► language ─► classify ─► extract ─► credibility ─┬─► summarize ─┐
-(CSV/JSON,  (script +   (MuRIL /    (places,   (heuristic  ├─► match       ├─► dashboard (Streamlit)
- replay)     romanised)  embed_lr /  phones,    misinfo     ├─► fuse ◄─────┘     api (FastAPI)
-                         keyword +   counts,    score)      └─► chatbot (RAG over data/docs + briefs)
-                         rules)      geocode)
+ LIVE                     data/sample_posts*.csv        data/sensors/*.csv     data/docs/*
+ SACHET, Bluesky,         (replayed in time order)      (rainfall, rivers)     (NDMA, SDMA)
+ GDELT (experimental)              │                           │                    │
+      │  SQLite store              │                           │                    │
+      └───────────┬────────────────┘                           │                    │
+                  ▼                                            │                    │
+              ┌────────┐  ┌──────────┐  ┌──────────┐  ┌─────────┐  ┌─────────────┐  │
+              │ ingest ├─►│ language ├─►│ classify ├─►│ extract ├─►│ credibility │  │
+              └────────┘  │ script + │  │ MuRIL +  │  │ places, │  │ heuristic   │  │
+                          │ romanised│  │ rules    │  │ phones, │  │ rumour score│  │
+                          └──────────┘  └──────────┘  │ geocode │  └──────┬──────┘  │
+                                                      └─────────┘         │         │
+                     ┌───────────────┬────────────────┬───────────────────┤         │
+                     ▼               ▼                ▼                   ▼         ▼
+               ┌───────────┐    ┌─────────┐      ┌────────┐         ┌──────────────────┐
+               │ summarize │    │  match  │      │  fuse  │◄sensors │ chatbot (RAG)    │
+               │ briefs    │    │ needs ↔ │      │ early  │         │ FAISS + guidance │
+               │ (LLM or   │    │ offers  │      │warnings│         │ + latest briefs  │
+               │ template) │    └────┬────┘      └───┬────┘         └────────┬─────────┘
+               └─────┬─────┘         │               │                       │
+                     └───────────────┴───────┬───────┴───────────────────────┘
+                                             ▼
+                              dashboard (Streamlit + Folium)   ·   api (FastAPI)
 ```
-Every stage reads and writes the shared Pydantic `Post` (`aquaalert/schemas.py`); `aquaalert/pipeline.py` runs
+Every stage reads and writes the shared Pydantic `Post` (`aquaalert/schemas.py`), and `aquaalert/pipeline.py` runs
 language → classify → extract → credibility over a list of posts.
 
 | Module | Role | Key files | Needs |
@@ -34,20 +80,81 @@ language → classify → extract → credibility over a list of posts.
 | `api/` | FastAPI service over all of the above | `main.py` | – |
 | `dashboard/` | Streamlit + Folium: map + district risk layer, warnings, briefs, matches, chatbot | `app.py`, `helpers.py` | – |
 
-## Quick start
+## Setup
+
+Tested from a clean clone on macOS with Python 3.11 (see [what the clean test covered](#tested-from-a-clean-clone)).
+
 ```bash
+git clone https://github.com/rebeccasaxena0908-netizen/aquaalert.git   # private: needs repo access
+cd aquaalert
 python3.11 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt      # torch/transformers are only needed to run or train MuRIL
-cp .env.example .env                 # optional: GEMINI_API_KEY / HF_TOKEN etc.
-python scripts/fetch_docs.py         # optional: NDMA / SDMA guideline documents for the chatbot
-python scripts/fetch_model.py        # optional: the trained MuRIL model (needs HF_TOKEN)
-pytest
+pip install -r requirements.txt      # about 5 minutes and 1.5 GB (includes torch)
+cp .env.example .env                 # every value is optional, see below
+pytest                               # first run about 7 minutes (downloads a 470 MB model), then under a minute
 ```
+
+That is enough for the demo on sample data, with the keyword classifier and offline fallbacks. For the trained classifier
+and the chatbot's documents:
+
+```bash
+python scripts/fetch_docs.py         # guideline documents for the chatbot; safe to run again if one fails
+# needs HF_TOKEN in .env, on an account with access to these private repos:
+python scripts/fetch_model.py --repo Rebeccccccaaaaaa/aquaalert-muril-romanised --out models/muril_romanised
+```
+
+### Secrets
+
+**None are required.** Put them in `.env`, which git ignores; never commit them.
+
+| Secret | Needed for | Without it | Where to get it |
+|---|---|---|---|
+| `HF_TOKEN` (read) | `scripts/fetch_model.py`, the trained MuRIL models | Keyword classifier, macro-F1 0.315 | [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens). The model repos are private, so the owner must also give your account access |
+| `GEMINI_API_KEY` (or `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`) | LLM daily briefs and chatbot answers | Offline template briefs; the chatbot quotes the relevant passages | Your provider's console |
+| `BLUESKY_HANDLE` + `BLUESKY_APP_PASSWORD` | Bluesky in Live mode | Its card shows `skipped`; SACHET still works | bsky.app → Settings → Privacy and security → App passwords. Never your main password |
+
+Only for retraining on Colab or Kaggle, entered in the platform's secrets store or a hidden prompt rather than `.env`: a
+`GITHUB_TOKEN` to clone this private repo and a Hugging Face token with **write** access to upload the model. Regenerating
+the romanised data with `scripts/make_romanised_data.py` needs `GEMINI_API_KEY`. SACHET, GDELT, HumAID, the guideline
+documents and the embedding model need no account.
+
+### Downloads
+
+| What | Size | How | Without it |
+|---|---|---|---|
+| Python packages | 1.5 GB | `pip install -r requirements.txt` | Required |
+| Sentence-embedding model (MiniLM) | 470 MB | **Automatic on first use**, from Hugging Face | Matching and the chatbot fall back to a weaker hashing encoder |
+| Guideline documents | about 7 MB | `python scripts/fetch_docs.py` | The chatbot has nothing to retrieve from except briefs |
+| Romanised MuRIL (best model) | 912 MB | `scripts/fetch_model.py`, see above | Next model in the order below |
+| English-only MuRIL | 912 MB | `python scripts/fetch_model.py --repo Rebeccccccaaaaaa/aquaalert-muril` | Only needed to compare models |
+| HumAID | HUMAID_SIZE | `python scripts/fetch_humaid.py` | Only needed to train or evaluate |
+| embed_lr baseline | 20 KB, but needs HumAID | Train it (below); it is not hosted anywhere | Only needed as a fallback or to compare |
+
+With `AQUAALERT_CLASSIFIER=auto` the classifier is romanised MuRIL if `models/muril_romanised/` exists, then
+`models/muril/`, then `models/embed_lr/`, then the keyword fallback. The header shows which one is active.
+
+```bash
+python -m aquaalert.classify.embed_lr --train data/raw/humaid/train.csv --val data/raw/humaid/dev.csv \
+    --test data/raw/humaid/test.csv --label-dataset humaid --out models/embed_lr
+```
+
+Never train MuRIL on a laptop: `notebooks/train_colab.ipynb` and `notebooks/train_kaggle.ipynb` run it on a T4 GPU and upload
+the result to your own private Hugging Face repo.
+
+### Tested from a clean clone
+
+CLEAN_TEST
+
+## Running
 
 ### Dashboard
 ```bash
 streamlit run dashboard/app.py       # http://localhost:8501
 ```
+The first time on a machine, Streamlit stops at an `Email:` prompt: press Enter to skip it. To run without a browser, add
+`--server.headless true`. The first page load takes a minute or so while models load.
+
+For Live mode pick **Dataset → LIVE**, or start with `AQUAALERT_MODE=live streamlit run dashboard/app.py`.
+
 Look: a single light "blue sky + frosted glass" theme. Base theme in `dashboard/styles.css`, AquaAlert components
 in `dashboard/app.css` (all classes `aa-`), HTML helpers in `dashboard/theme.py`, Streamlit colours in
 `.streamlit/config.toml`. The animated background (drifting blobs, rising bubbles) pauses with the sidebar toggle and
@@ -73,7 +180,7 @@ uvicorn api.main:app --reload        # interactive docs: http://127.0.0.1:8000/d
 | `GET /labels` | the 7 categories |
 
 Posts are processed once at startup from `AQUAALERT_DATASET`. There is no authentication: run it locally or behind
-your own gateway. Example: `curl -s localhost:8000/warnings?day=2018-08-15&level=warning`.
+your own gateway. Example: `curl -s "localhost:8000/warnings?day=2018-08-15&level=warning"`.
 
 ### CLIs
 ```bash
@@ -86,8 +193,95 @@ python -m aquaalert.language.evaluate
 python -m aquaalert.credibility.evaluate
 python -m aquaalert.classify.train --train ... --val ... --test ... --label-dataset humaid --out models/muril  # on Colab/Kaggle
 ```
-With `AQUAALERT_CLASSIFIER=auto` the classifier is MuRIL if `models/muril/` exists, then `embed_lr`, then the
-keyword fallback.
+
+## Results
+
+All four classifiers on the same HumAID test split (15,160 English tweets, labels mapped to AquaAlert's 7 classes by
+`classify/label_map.py`, distress rules off). Cells are per-class F1; bold marks the best per row. Confidence intervals are
+bootstrap 95 % from 1,000 test-set resamples. "5 large classes" leaves out `rescue_needed` and `missing_person`.
+
+| Class | Test tweets | Keyword fallback | embed_lr | MuRIL | MuRIL + romanised |
+|---|---:|---:|---:|---:|---:|
+| `rescue_needed` | 22 | 0.028 | 0.280 | **0.571** | 0.558 |
+| `infrastructure_damage` | 1,617 | 0.416 | 0.741 | 0.803 | **0.809** |
+| `need_supplies` | 499 | 0.181 | 0.433 | **0.575** | 0.567 |
+| `offer_help` | 4,219 | 0.374 | 0.810 | 0.862 | **0.866** |
+| `missing_person` | 72 | 0.471 | 0.521 | 0.725 | **0.776** |
+| `info_update` | 5,714 | 0.342 | 0.749 | 0.803 | **0.814** |
+| `irrelevant` | 3,017 | 0.395 | 0.701 | 0.752 | **0.761** |
+| **Macro-F1, all 7** (95 % CI) | | 0.315 (0.302–0.327) | 0.605 (0.582–0.625) | 0.727 (0.700–0.752) | **0.736** (0.706–0.764) |
+| **Macro-F1, 5 large** (95 % CI) | | 0.342 (0.332–0.352) | 0.687 (0.677–0.696) | 0.759 (0.750–0.768) | **0.763** (0.754–0.773) |
+| Accuracy | | 0.354 | 0.734 | 0.800 | **0.807** |
+
+- **The difference between the two MuRIL models is within the confidence intervals.** HumAID is English-only, so this table
+  mainly shows the romanised data did not hurt English. Its benefit shows on romanised text: see
+  [Romanised model: before / after](#romanised-model-before--after), measured on 6–11 hand-written posts per language.
+- **Keyword fallback:** rules, no training. Its keywords were tuned on the synthetic sample posts, not on HumAID.
+- **embed_lr:** frozen `paraphrase-multilingual-MiniLM-L12-v2` embeddings with class-weighted logistic regression (C=300
+  chosen on dev). Trains on a laptop in minutes.
+- **MuRIL:** `google/muril-base-cased` fine-tuned on a T4 GPU (4 epochs, inverse-frequency class-weighted loss, checkpoint
+  chosen by dev macro-F1). **MuRIL + romanised** adds the 4,552 LLM-generated training rows.
+- With the distress rules on, macro-F1 drops to 0.722 (MuRIL) and 0.731 (romanised). They are kept because a missed rescue
+  request costs more than a false alarm; see [Distress rules](#distress-rules).
+- **Rescue numbers are weak.** `rescue_needed` has 22 test tweets, and its gold labels come from a regex over HumAID's
+  urgent-needs class, because HumAID has no rescue class.
+
+## Limitations
+
+**Models**
+- Rescue, the class that matters most, has the least evidence: 22 test tweets with regex-derived labels.
+- The per-language test sets are tiny (6–11 posts) and written by us, so one post moves accuracy by 9–17 points.
+- The romanised training data is LLM-written (about 10 % meaning drift in a spot check), and Bengali fell short of its
+  target. Banglish is still the weakest language at 0.50. Real romanised posts may do worse.
+- The models learned from 2016–2019 tweets; 2026 posts and headlines differ, so expect lower accuracy than the table above.
+
+**Live mode**
+- Live posts are mostly news-style, so rescue and matching are shown with **Simulate incident**. Outside a real flood the
+  feed can be empty for hours, and Bluesky is small in India.
+- SACHET polygons could not be read (their file returned HTTP 403 on 2 Nov 2026), so most real alerts are not placed
+  precisely. State-level banners mark a general point for the state, not the affected area.
+- GDELT news has never worked in a live test, and is off by default.
+
+**Other stages**
+- Credibility is heuristic and was tuned on 16 synthetic rumour posts. Treat a score as "check this", never as proof.
+- Early warnings use synthetic sensor data. Live warnings use post volume alone, because the bundled files cover August
+  2018 only.
+- Matching inherits classifier errors. Some offers are misread as needs and matched to other offers, and at default settings
+  no genuine Hinglish need gets a match (m010 → s035 needs **One offer per need** turned off).
+- The gazetteer covers Kerala, Assam, Odisha, West Bengal, Bihar and Uttar Pradesh only, and villages it does not know get no
+  pin. Same-named places in other states can be mis-pinned, and a few Kerala pins use a stand-in entity (see
+  [Geocoding](#geocoding)).
+- The API has no authentication, so run it locally.
+- `requirements.txt` sets minimum versions only, so a later install can differ from the tested one.
+
+## Next steps
+
+1. **NDMA polygon access for SACHET**, so official alerts can be drawn on the real affected area.
+2. **Hand-labelled rescue posts**, to replace the regex-derived labels and the 22-tweet test set.
+3. **Bengali data top-up**, for the training shortfall and for Banglish.
+4. **Real CWC river data** (and IMD rainfall), to replace the synthetic sensor files.
+5. **UP/Bihar case study**, to test the new gazetteer on a real event outside Kerala.
+6. **Verify GDELT news**, or remove it.
+
+## Licences and data terms
+
+**This repo has no licence file, so no reuse is granted. Keep it private until the questions below are settled.** This
+section records what was checked on 3 Nov 2026 and is not legal advice.
+
+| Material | Terms | Where it is | Status |
+|---|---|---|---|
+| HumAID | **CC BY-NC-SA 4.0** according to the [Hugging Face mirror's card](https://huggingface.co/datasets/QCRI/HumAID-all): attribution, non-commercial, share-alike | `data/raw/` (git-ignored) | **Unsure:** the official CrisisNLP page returned HTTP 403 here, so its own terms were not read. The tweets may also be subject to X/Twitter's terms on sharing tweet text, which were not checked |
+| `data/processed/romanised_humaid.csv` | Derived from HumAID, so probably share-alike and non-commercial. Google's terms for Gemini output were not checked | **Tracked in this repo and its history** | **Contains raw tweets:** its `source_text` column holds 4,552 HumAID tweets word for word, 1,709 of them with @handles. Do not publish this file or this repo's history as they stand |
+| Trained models | Trained on HumAID, so possibly covered by the same terms | Private Hugging Face repos | **Unsure** whether a model counts as an adaptation. Keep private and non-commercial until checked |
+| MuRIL, MiniLM base models | Apache-2.0 according to their model cards | Downloaded, not in the repo | Fine |
+| Wikidata | CC0 | `aquaalert/extract/gazetteer_*.csv` | Fine |
+| NDMA and SDMA documents | No licence was found | `data/docs/` (git-ignored, not redistributed) | **Unsure:** check before republishing them |
+| SACHET alerts, Bluesky posts | Public feeds; their terms on storing and republishing were not reviewed | `data/cache/` (git-ignored), plus saved examples in `tests/fixtures/live/` (a real SACHET feed and alert; 11 Bluesky post texts, no handles) | **Unsure:** review before making the repo public |
+| Map tiles | © OpenStreetMap contributors, attributed on the map | Loaded at runtime | Fine |
+
+---
+
+# Details
 
 ## Live mode (ingest/live.py)
 The sidebar **Dataset** selector marks every dataset: **LIVE** (polled sources), **REPLAY · SYNTHETIC** (the
@@ -438,30 +632,5 @@ Caveats:
   `need_supplies` (0.575 → 0.567); Malayalam script is unchanged; on the English sample the old model *with* the
   distress rules (0.80) still beats the new one (0.76), where the rules no longer add anything.
 
-## Results
-
-All three classifiers on the same HumAID test split (15,160 tweets, labels mapped to AquaAlert's 7 classes by
-`classify/label_map.py`). Cells are per-class F1; bold marks the best model per row. Bootstrap 95% CIs use 1000
-test-set resamples. "5 large classes" excludes `rescue_needed` and `missing_person`.
-
-| Class | Test examples | Keyword fallback | embed_lr | MuRIL |
-|---|---:|---:|---:|---:|
-| `rescue_needed` | 22 | 0.028 | 0.280 | **0.571** |
-| `infrastructure_damage` | 1617 | 0.416 | 0.741 | **0.803** |
-| `need_supplies` | 499 | 0.181 | 0.433 | **0.575** |
-| `offer_help` | 4219 | 0.374 | 0.810 | **0.862** |
-| `missing_person` | 72 | 0.471 | 0.521 | **0.725** |
-| `info_update` | 5714 | 0.342 | 0.749 | **0.803** |
-| `irrelevant` | 3017 | 0.395 | 0.701 | **0.752** |
-| **Macro-F1, all 7** (95% CI) | | 0.315 (0.302–0.327) | 0.605 (0.582–0.625) | 0.727 (0.700–0.752) |
-| **Macro-F1, 5 large classes** (95% CI) | | 0.342 (0.332–0.352) | 0.687 (0.677–0.696) | 0.759 (0.750–0.768) |
-| Accuracy | | 0.354 | 0.734 | 0.800 |
-
-- **Keyword fallback:** zero-shot rules, no training. Its keywords were tuned on the 50 synthetic sample posts, not on HumAID.
-- **embed_lr:** frozen `paraphrase-multilingual-MiniLM-L12-v2` embeddings + class-weighted logistic regression (C=300 chosen on dev). Trains on a Mac in minutes.
-- **MuRIL:** `google/muril-base-cased` fine-tuned on Colab (4 epochs, inverse-frequency class-weighted loss, checkpoint chosen by dev macro-F1). Stored in a private Hugging Face repo; pull it with `python scripts/fetch_model.py`.
-- `rescue_needed` (22 test examples) and `missing_person` (72) are small, so their F1 and the all-7 macro-F1 have wide intervals. Gold `rescue_needed` labels come from a regex rule over HumAID's `requests_or_urgent_needs` class.
-- `AQUAALERT_CLASSIFIER=auto` uses MuRIL if `models/muril/` exists, then `embed_lr`, then the keyword fallback.
-
-## Data
-See [scripts/download_data.md](scripts/download_data.md). `data/sample_posts.csv` is synthetic.
+## Data files
+See [scripts/download_data.md](scripts/download_data.md).
