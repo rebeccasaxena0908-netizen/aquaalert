@@ -90,7 +90,7 @@ cd aquaalert
 python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt      # about 5 minutes and 1.5 GB (includes torch)
 cp .env.example .env                 # every value is optional, see below
-pytest                               # first run about 7 minutes (downloads a 470 MB model), then under a minute
+pytest                               # first run 4-7 minutes (downloads a 470 MB model), then under a minute
 ```
 
 That is enough for the demo on sample data, with the keyword classifier and offline fallbacks. For the trained classifier
@@ -123,10 +123,10 @@ documents and the embedding model need no account.
 |---|---|---|---|
 | Python packages | 1.5 GB | `pip install -r requirements.txt` | Required |
 | Sentence-embedding model (MiniLM) | 470 MB | **Automatic on first use**, from Hugging Face | Matching and the chatbot fall back to a weaker hashing encoder |
-| Guideline documents | about 7 MB | `python scripts/fetch_docs.py` | The chatbot has nothing to retrieve from except briefs |
+| Guideline documents | about 6 MB | `python scripts/fetch_docs.py` | The chatbot has nothing to retrieve from except briefs |
 | Romanised MuRIL (best model) | 912 MB | `scripts/fetch_model.py`, see above | Next model in the order below |
 | English-only MuRIL | 912 MB | `python scripts/fetch_model.py --repo Rebeccccccaaaaaa/aquaalert-muril` | Only needed to compare models |
-| HumAID | HUMAID_SIZE | `python scripts/fetch_humaid.py` | Only needed to train or evaluate |
+| HumAID | 13 MB | `python scripts/fetch_humaid.py` | Only needed to train or evaluate |
 | embed_lr baseline | 20 KB, but needs HumAID | Train it (below); it is not hosted anywhere | Only needed as a fallback or to compare |
 
 With `AQUAALERT_CLASSIFIER=auto` the classifier is romanised MuRIL if `models/muril_romanised/` exists, then
@@ -142,7 +142,15 @@ the result to your own private Hugging Face repo.
 
 ### Tested from a clean clone
 
-CLEAN_TEST
+On 3 Nov 2026, a new clone in a temporary folder with an empty home directory, no `.env` values, no models and no data from
+the working folder, on macOS with Python 3.11:
+
+- **Passed:** install, all 366 tests, `fetch_docs.py`, `fetch_humaid.py`, the dashboard (all five tabs in Replay and Live mode,
+  no exceptions), every API endpoint tried, and the dashboard test offline with no model cache.
+- **Not finished:** the full download of the trained model, stopped at a time limit (token access to both repos was
+  confirmed), so the dashboard was not run with the trained model in this test. `embed_lr` training was skipped to save time.
+- **Not exercised:** Gemini, and live polling of SACHET and Bluesky from the clone (both worked from the working folder on
+  2 Nov 2026).
 
 ## Running
 
